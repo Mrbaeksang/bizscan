@@ -17,6 +17,7 @@ interface ProgressModalProps {
   progress: number
   currentFile?: number
   totalFiles?: number
+  currentFileName?: string
 }
 
 const statusMessages = {
@@ -30,7 +31,8 @@ export function ProgressModal({
   status, 
   progress, 
   currentFile, 
-  totalFiles 
+  totalFiles,
+  currentFileName 
 }: ProgressModalProps) {
   return (
     <Dialog open={open}>
@@ -43,9 +45,16 @@ export function ProgressModal({
           <DialogDescription className="pt-4">
             {statusMessages[status]}
             {currentFile && totalFiles && status === 'analyzing' && (
-              <span className="block mt-2 font-medium">
-                이미지 분석 중... ({currentFile}/{totalFiles})
-              </span>
+              <>
+                <span className="block mt-2 font-medium">
+                  이미지 분석 중... ({currentFile}/{totalFiles})
+                </span>
+                {currentFileName && (
+                  <span className="block mt-1 text-sm text-muted-foreground">
+                    파일: {currentFileName}
+                  </span>
+                )}
+              </>
             )}
           </DialogDescription>
         </DialogHeader>

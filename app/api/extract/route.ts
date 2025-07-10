@@ -65,7 +65,7 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
     
     // 각 모델을 순서대로 시도
     for (const model of models) {
-      console.log(`Trying model: ${model}`)
+      console.log(`🔄 Trying model: ${model} with API key ${apiKeysToTry.indexOf(apiKey) + 1}`)
       
       const requestBody = {
       model: model,
@@ -156,20 +156,21 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
 
       return extractedData
     } catch (error) {
-      console.error(`Error with model ${model}:`, error)
+      console.error(`❌ Error with model ${model}:`, error)
       lastError = error
       
       // 429 에러인 경우 다음 모델 시도
       if (error instanceof Error && error.message.includes('429')) {
-        console.log(`Model ${model} is rate limited, trying next model...`)
+        console.log(`⚠️ Model ${model} is rate limited, trying next model...`)
         // 잠시 대기 후 다음 모델 시도
         await new Promise(resolve => setTimeout(resolve, 1000))
         continue
       }
       
-        // 다른 에러인 경우 다음 모델 시도
-        continue
-      }
+      // 다른 에러인 경우에도 다음 모델 시도
+      console.log(`⚠️ Model ${model} failed, trying next model...`)
+      continue
+    }
     }
   }
   
@@ -205,99 +206,71 @@ export async function POST(req: NextRequest) {
     }
 
     const allExtractedData: any[] = []
+    const failedFiles: string[] = [] // 실패한 파일 목록
 
-    // 병렬 처리 옵션 (동시에 최대 3개까지만)
-    const CONCURRENT_LIMIT = 3
-    const processInBatches = false // true로 변경하면 동시 처리
-
-    if (processInBatches) {
-      // 병렬 처리
-      for (let i = 0; i < files.length; i += CONCURRENT_LIMIT) {
-        const batch = files.slice(i, i + CONCURRENT_LIMIT)
-        const promises = batch.map(async (file, index) => {
-          console.log(`Processing file ${i + index + 1}/${files.length}: ${file.name}, size: ${file.size}`)
-          const buffer = Buffer.from(await file.arrayBuffer())
-          try {
-            const data = await extractInfoFromImage(buffer)
-            console.log(`Successfully extracted data from ${file.name}:`, data)
-            return {
-              success: true,
-              data,
-              fileName: file.name
-            }
-          } catch (error) {
-            console.error(`Error processing file ${file.name}:`, error)
-            return {
-              success: false,
-              fileName: file.name,
-              error
-            }
-          }
-        })
-        
-        const results = await Promise.all(promises)
-        results.forEach(result => {
-          if (result.success && result.data) {
-            const mappedData = {
-              companyAndRepresentative: `${result.data.상호명 || ''}(${result.data.대표자명 || ''})`,
-              openTime: '',
-              memo: '',
-              address: result.data.사업자주소 || '',
-              businessRegistrationNumber: result.data.사업자등록번호 || '',
-              phoneNumber: '',
-              isOperational: ''
-            }
-            allExtractedData.push(mappedData)
-          } else {
-            allExtractedData.push({
-              companyAndRepresentative: `처리 실패: ${result.fileName}`,
-              openTime: '',
-              memo: '이미지 처리 중 오류 발생',
-              address: '',
-              businessRegistrationNumber: '',
-              phoneNumber: '',
-              isOperational: ''
-            })
-          }
-        })
-      }
-    } else {
-      // 순차 처리 (현재 방식)
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        console.log(`Processing file ${i + 1}/${files.length}: ${file.name}, size: ${file.size}`)
-        const buffer = Buffer.from(await file.arrayBuffer())
-        
+    // *** FIX: 순차 처리 로직만 남기고, 재시도 로직을 적용 ***
+    const MAX_RETRIES = 3 // 파일당 최대 재시도 횟수
+    
+    // 각 파일을 순차적으로 처리
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      console.log(`\n=== Processing file ${i + 1}/${files.length}: ${file.name} ===`)
+      
+      let success = false
+      let retryCount = 0
+      
+      // 재시도 로직
+      while (!success && retryCount < MAX_RETRIES) {
         try {
+          console.log(`Attempt ${retryCount + 1}/${MAX_RETRIES} for ${file.name}`)
+          const buffer = Buffer.from(await file.arrayBuffer())
           const data = await extractInfoFromImage(buffer)
-          console.log(`Successfully extracted data from ${file.name}:`, data)
-        
-        // 엑셀 형식에 맞게 데이터 변환
-        const mappedData = {
-          companyAndRepresentative: `${data.상호명 || ''}(${data.대표자명 || ''})`,
-          openTime: '',
-          memo: '',
-          address: data.사업자주소 || '',
-          businessRegistrationNumber: data.사업자등록번호 || '',
-          phoneNumber: '',
-          isOperational: ''
-        }
-        
-          allExtractedData.push(mappedData)
-        } catch (error) {
-          console.error(`Error processing file ${file.name}:`, error)
-          // 실패한 파일은 빈 데이터로 추가
-          allExtractedData.push({
-            companyAndRepresentative: `처리 실패: ${file.name}`,
+          
+          console.log(`✅ Successfully extracted data from ${file.name}:`, data)
+          
+          // 성공한 데이터 변환
+          const mappedData = {
+            companyAndRepresentative: `${data.상호명 || ''}(${data.대표자명 || ''})`,
             openTime: '',
-            memo: '이미지 처리 중 오류 발생',
-            address: '',
-            businessRegistrationNumber: '',
+            memo: '',
+            address: data.사업자주소 || '',
+            businessRegistrationNumber: data.사업자등록번호 || '',
             phoneNumber: '',
             isOperational: ''
-          })
+          }
+          
+          allExtractedData.push(mappedData)
+          success = true
+          
+        } catch (error) {
+          console.error(`❌ Attempt ${retryCount + 1} failed for ${file.name}:`, error)
+          retryCount++
+          
+          if (retryCount < MAX_RETRIES) {
+            console.log(`⏳ Waiting 2 seconds before retry...`)
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          }
         }
       }
+      
+      // 모든 재시도 실패 시 - 실패 목록에 추가
+      if (!success) {
+        console.error(`❌❌ All attempts failed for ${file.name}`)
+        failedFiles.push(file.name)
+      }
+    }
+    
+    // *** FIX: 불필요한 if(false) 블록과 중복되는 else 블록 전체 제거 ***
+
+    // 성공한 데이터가 하나도 없으면 에러 반환
+    if (allExtractedData.length === 0) {
+      return NextResponse.json(
+        { 
+          error: '모든 파일 처리에 실패했습니다.',
+          failedFiles: failedFiles 
+        },
+        { status: 400 }
+      )
     }
 
     // 엑셀 파일 생성
@@ -323,7 +296,7 @@ export async function POST(req: NextRequest) {
       fgColor: { argb: 'FFE0E0E0' }
     }
 
-    // 데이터 추가
+    // 데이터 추가 (성공한 데이터만)
     allExtractedData.forEach(data => {
       worksheet.addRow(data)
     })
@@ -331,13 +304,18 @@ export async function POST(req: NextRequest) {
     // 엑셀 파일을 버퍼로 변환
     const buffer = await workbook.xlsx.writeBuffer()
 
+    // 실패한 파일 정보를 헤더에 포함
+    const headers: HeadersInit = {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="bizscan_results.xlsx"'
+    }
+    
+    if (failedFiles.length > 0) {
+      headers['X-Failed-Files'] = JSON.stringify(failedFiles)
+    }
+
     // 응답 반환
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="bizscan_results.xlsx"'
-      }
-    })
+    return new NextResponse(buffer, { headers })
   } catch (error) {
     console.error('Error processing request:', error)
     return NextResponse.json(

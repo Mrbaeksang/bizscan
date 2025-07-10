@@ -50,10 +50,10 @@ export default function LoginPage() {
           <div className="flex flex-col items-center mb-8">
             <div className="flex items-center gap-2 mb-4">
               <FileSpreadsheet className="h-10 w-10 text-primary" />
-              <h1 className="text-3xl font-bold text-slate-900">BizScan</h1>
+              <h1 className="text-3xl font-bold text-slate-900">최원희</h1>
             </div>
             <p className="text-slate-600 text-center">
-              사업자등록증 스캔 서비스에 로그인하세요
+              볼 때 마다 고맙게 생각해라
             </p>
           </div>
 

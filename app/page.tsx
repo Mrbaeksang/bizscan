@@ -5,9 +5,10 @@ import axios from 'axios'
 import { useRouter } from 'next/navigation'
 import { FileDropzone } from '@/components/file-dropzone'
 import { ProgressModal } from '@/components/progress-modal'
+import { FailedFilesModal } from '@/components/failed-files-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, LogOut } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, LogOut, Eye } from 'lucide-react'
 
 type Status = 'idle' | 'uploading' | 'analyzing' | 'generating' | 'success' | 'error'
 
@@ -19,6 +20,10 @@ export default function Home() {
   const [currentFile, setCurrentFile] = useState(0)
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+  const [failedFiles, setFailedFiles] = useState<string[]>([])
+  const [successCount, setSuccessCount] = useState(0)
+  const [pendingData, setPendingData] = useState<Blob | null>(null) // 생성 대기 중인 데이터
+  const [showFailedFilesModal, setShowFailedFilesModal] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -89,7 +94,20 @@ export default function Home() {
       // 약간의 지연 후 완료
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      setExcelBlob(response.data)
+      // 실패한 파일 확인
+      const failedFilesHeader = response.headers['x-failed-files']
+      // *** FIX: totalFiles 변수 중복 선언 제거 ***
+      const failedCount = failedFilesHeader ? JSON.parse(failedFilesHeader).length : 0
+      const successfulCount = totalFiles - failedCount
+      
+      if (failedFilesHeader) {
+        const failed = JSON.parse(failedFilesHeader)
+        setFailedFiles(failed)
+        console.log('Failed files:', failed)
+      }
+      
+      setSuccessCount(successfulCount)
+      setPendingData(response.data) // 엑셀 데이터를 대기 상태로 저장
       setStatus('success')
       setProgress(100)
       
@@ -111,13 +129,36 @@ export default function Home() {
         if (error.response?.data instanceof Blob) {
           const text = await error.response.data.text()
           console.error('Error response text:', text)
+          setErrorMessage(text) // Blob 형태의 에러 메시지를 표시하도록 개선
+        } else if (typeof error.response?.data?.error === 'string') {
+          setErrorMessage(error.response.data.error)
+        } else {
+          setErrorMessage('파일 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
         }
       }
       setStatus('error')
-      setErrorMessage('파일 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
       setProgress(0)
       setCurrentFile(0)
     }
+  }
+
+  const handleGenerateExcel = () => {
+    if (pendingData) {
+      setExcelBlob(pendingData)
+      setPendingData(null)
+    }
+  }
+
+  const handleRetryFailed = () => {
+    // 실패한 파일들만 다시 선택
+    const failedFileNames = new Set(failedFiles)
+    const filesToRetry = files.filter(file => failedFileNames.has(file.name))
+    setFiles(filesToRetry)
+    setStatus('idle')
+    setFailedFiles([])
+    setSuccessCount(0)
+    setPendingData(null)
+    setExcelBlob(null)
   }
 
   const handleDownload = () => {
@@ -131,10 +172,7 @@ export default function Home() {
       a.remove()
       window.URL.revokeObjectURL(url)
       
-      // 다운로드 후 초기화
-      setExcelBlob(null)
-      setStatus('idle')
-      setFiles([])
+      // 다운로드 후에도 상태 유지 (재시도 가능하도록)
     }
   }
 
@@ -178,26 +216,96 @@ export default function Home() {
             </Alert>
           )}
 
-          {status === 'success' && (
-            <Alert className="border-green-200 bg-green-50">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                엑셀 파일이 성공적으로 생성되었습니다. 아래 버튼을 클릭하여 다운로드하세요.
+          {status === 'success' && pendingData && !excelBlob && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <div className="space-y-2">
+                  <p className="font-semibold">
+                    총 {files.length}개 파일 중 {successCount}개 성공, {failedFiles.length}개 실패
+                  </p>
+                  <p>
+                    {successCount > 0 ? `${successCount}개의 성공한 파일만으로 엑셀을 생성하시겠습니까?` : '성공한 파일이 없습니다.'}
+                  </p>
+                  {failedFiles.length > 0 && (
+                    <div className="mt-3 p-3 bg-blue-100/50 rounded">
+                      <p className="text-sm font-medium mb-1">실패한 파일:</p>
+                      <ul className="list-disc list-inside text-sm">
+                        {failedFiles.map((file, index) => (
+                          <li key={index}>{file}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </AlertDescription>
             </Alert>
           )}
 
-          <div className="flex gap-3">
-            {status === 'success' && excelBlob ? (
-              <Button 
-                onClick={handleDownload}
-                className="w-full h-14 text-lg"
-                size="lg"
-              >
-                <Download className="mr-2 h-5 w-5" />
-                엑셀 다운로드
-              </Button>
-            ) : (
+          {status === 'success' && excelBlob && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                엑셀 파일이 준비되었습니다! 다운로드 버튼을 클릭하세요.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex gap-3 flex-wrap">
+            {/* 처리 완료 후 선택 버튼들 */}
+            {status === 'success' && pendingData && !excelBlob && (
+              <>
+                {successCount > 0 && (
+                  <Button 
+                    onClick={handleGenerateExcel}
+                    className="flex-1 h-14 text-lg"
+                    size="lg"
+                  >
+                    <CheckCircle2 className="mr-2 h-5 w-5" />
+                    {successCount}개만 엑셀 생성
+                  </Button>
+                )}
+                {failedFiles.length > 0 && (
+                  <Button 
+                    onClick={handleRetryFailed}
+                    variant="outline"
+                    className="flex-1 h-14 text-lg"
+                    size="lg"
+                  >
+                    <AlertCircle className="mr-2 h-5 w-5" />
+                    {failedFiles.length}개 재시도
+                  </Button>
+                )}
+              </>
+            )}
+
+            {/* 엑셀 다운로드 버튼 */}
+            {status === 'success' && excelBlob && (
+              <>
+                <Button 
+                  onClick={handleDownload}
+                  className="flex-1 h-14 text-lg"
+                  size="lg"
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  엑셀 다운로드
+                </Button>
+                {failedFiles.length > 0 && (
+                  <Button 
+                    onClick={handleRetryFailed}
+                    variant="outline"
+                    className="flex-1 h-14 text-lg"
+                    size="lg"
+                  >
+                    <AlertCircle className="mr-2 h-5 w-5" />
+                    실패한 {failedFiles.length}개 재시도
+                  </Button>
+                )}
+              </>
+            )}
+
+            {/* 초기 엑셀 생성 버튼 */}
+            {(!status || status === 'idle' || status === 'error') && (
               <Button 
                 onClick={handleSubmit}
                 disabled={files.length === 0 || isProcessing}
