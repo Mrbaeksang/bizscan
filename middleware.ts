@@ -1,38 +1,31 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// 허용할 IP 주소 목록 (환경변수 또는 기본값)
-const ALLOWED_IPS = process.env.ALLOWED_IPS 
-  ? process.env.ALLOWED_IPS.split(',').map(ip => ip.trim())
-  : [
-      '14.43.219.252',  // 당신의 IP
-      '::1',            // localhost IPv6
-      '127.0.0.1',      // localhost IPv4
-    ]
-
 export function middleware(request: NextRequest) {
-  // IP 주소 가져오기
-  const ip = request.ip || request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')
+  const path = request.nextUrl.pathname
   
-  console.log('Incoming IP:', ip)
+  // 로그인 페이지와 API는 인증 없이 접근 가능
+  const isPublicPath = path === '/login' || path === '/api/auth/login'
   
-  // 개발 환경에서는 허용
-  if (process.env.NODE_ENV === 'development') {
-    return NextResponse.next()
+  // 쿠키에서 토큰 확인
+  const token = request.cookies.get('auth_token')?.value || ''
+  
+  // 로그인하지 않은 상태에서 보호된 페이지 접근 시 로그인 페이지로 리다이렉트
+  if (!isPublicPath && !token) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
   
-  // IP 확인
-  if (ip && !ALLOWED_IPS.includes(ip.split(',')[0].trim())) {
-    return new NextResponse('Access Denied', {
-      status: 403,
-      statusText: 'Forbidden',
-    })
+  // 로그인한 상태에서 로그인 페이지 접근 시 메인 페이지로 리다이렉트
+  if (isPublicPath && token && path === '/login') {
+    return NextResponse.redirect(new URL('/', request.url))
   }
   
   return NextResponse.next()
 }
 
-// 모든 경로에 적용
+// 인증이 필요한 경로 설정
 export const config = {
-  matcher: '/((?!_next/static|_next/image|favicon.ico).*)',
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ]
 }

@@ -2,21 +2,33 @@
 
 import React, { useState } from 'react'
 import axios from 'axios'
+import { useRouter } from 'next/navigation'
 import { FileDropzone } from '@/components/file-dropzone'
 import { ProgressModal } from '@/components/progress-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, AlertCircle, Download, FileSpreadsheet } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, LogOut } from 'lucide-react'
 
 type Status = 'idle' | 'uploading' | 'analyzing' | 'generating' | 'success' | 'error'
 
 export default function Home() {
+  const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [status, setStatus] = useState<Status>('idle')
   const [progress, setProgress] = useState(0)
   const [currentFile, setCurrentFile] = useState(0)
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      localStorage.removeItem('auth_token')
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   const handleSubmit = async () => {
     console.log('handleSubmit called with files:', files)
@@ -131,6 +143,17 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="container mx-auto py-12 px-4 max-w-4xl">
+        <div className="absolute top-4 right-4">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            로그아웃
+          </Button>
+        </div>
+        
         <div className="text-center mb-12">
           <div className="flex justify-center items-center gap-3 mb-4">
             <FileSpreadsheet className="h-10 w-10 text-primary" />
