@@ -44,7 +44,7 @@ export default function SimpleAuthPage() {
         setStatus('error')
         setMessage(data.error || '요청 처리 중 오류가 발생했습니다.')
       }
-    } catch (error) {
+    } catch {
       setStatus('error')
       setMessage('네트워크 오류가 발생했습니다.')
     }

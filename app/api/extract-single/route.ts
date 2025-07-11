@@ -33,7 +33,7 @@ interface ExtractedData {
   사업자등록번호: string
 }
 
-async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData> {
+async function extractInfoFromImage(imageBuffer: Buffer, customModels?: string[]): Promise<ExtractedData> {
   const apiKeys = process.env.OPENROUTER_API_KEY?.split(',').map(key => key.trim()) || []
   const primaryApiKey = apiKeys[0] || process.env.OPENROUTER_API_KEY
   
@@ -43,13 +43,16 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
 
   const base64Image = imageBuffer.toString('base64')
 
-  // 여러 모델을 시도할 수 있도록 배열로 관리
-  const models = [
-    'google/gemini-2.0-flash-exp:free',
-    'qwen/qwen2.5-vl-72b-instruct:free',
+  // 모델 순위 설정 (커스텀 모델 순위가 있으면 사용, 없으면 기본값)
+  const models = customModels || [
+    'google/gemini-2.0-flash-exp:free',     // 기본 1순위
+    'qwen/qwen2.5-vl-72b-instruct:free',    // 기본 2순위
+    'mistralai/mistral-small-3.2-24b-instruct:free'  // 기본 3순위
   ]
+  
+  console.log(`🎯 [BIZSCAN] 사용할 모델 순위: ${models.join(' → ')}`)
 
-  let lastError: any = null
+  let lastError: Error | null = null
   const apiKeysToTry = apiKeys.length > 0 ? apiKeys : [primaryApiKey]
   
   for (const apiKey of apiKeysToTry) {
@@ -101,7 +104,6 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
         const content = data.choices[0].message.content
         
         // JSON 파싱 (마크다운 코드 블록 제거)
-        let extractedData: ExtractedData
         let cleanContent = content
         
         if (content.includes('```json')) {
@@ -110,7 +112,8 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
           cleanContent = content.replace(/```\s*/g, '').trim()
         }
         
-        extractedData = JSON.parse(cleanContent) as ExtractedData
+        // eslint-disable-next-line prefer-const
+        let extractedData = JSON.parse(cleanContent) as ExtractedData
 
         // 사업자등록번호 형식 정규화
         if (extractedData.사업자등록번호) {
@@ -122,7 +125,7 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
 
         return extractedData
       } catch (error) {
-        lastError = error
+        lastError = error as Error
         
         // 429 에러인 경우 다음 모델 시도 (대기시간 단축)
         if (error instanceof Error && error.message.includes('429')) {
@@ -151,6 +154,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File
+    const modelPriorityStr = formData.get('modelPriority') as string
     
     if (!file) {
       return NextResponse.json(
@@ -159,8 +163,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 모델 순위 파싱
+    let customModels: string[] | undefined
+    if (modelPriorityStr) {
+      try {
+        const parsed = JSON.parse(modelPriorityStr)
+        if (Array.isArray(parsed) && parsed.length === 3) {
+          customModels = parsed
+        }
+      } catch {
+        console.log('모델 순위 파싱 실패, 기본값 사용')
+      }
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer())
-    const data = await extractInfoFromImage(buffer)
+    const data = await extractInfoFromImage(buffer, customModels)
     
     // 성공한 데이터 변환
     const mappedData = {

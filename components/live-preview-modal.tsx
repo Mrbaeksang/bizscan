@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, AlertCircle, X, Download, RefreshCw } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, RefreshCw } from 'lucide-react'
 import { clientStorage } from '@/lib/client-storage'
 import type { StoredResult } from '@/lib/client-storage'
 

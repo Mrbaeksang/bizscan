@@ -7,7 +7,7 @@ import { FailedFilesModal } from '@/components/failed-files-modal'
 import { LivePreviewModal } from '@/components/live-preview-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Table, Mail } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Table, Mail, RefreshCw, X } from 'lucide-react'
 import { compressImage } from '@/lib/image-utils'
 import { clientStorage } from '@/lib/client-storage'
 import { generateExcelFromData, generatePartialExcel } from '@/lib/excel-generator'
@@ -34,6 +34,14 @@ export default function Home() {
   const [showFailedFilesModal, setShowFailedFilesModal] = useState(false)
   const [showLivePreview, setShowLivePreview] = useState(false)
   const cancelRef = useRef(false)
+  const [infiniteRetryMode, setInfiniteRetryMode] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const [enableTextReview, setEnableTextReview] = useState(false)
+  const [modelPriority, setModelPriority] = useState({
+    first: 'google/gemini-2.0-flash-exp:free',
+    second: 'qwen/qwen2.5-vl-72b-instruct:free',
+    third: 'mistralai/mistral-small-3.2-24b-instruct:free'
+  })
 
   // 인증 상태 확인
   useEffect(() => {
@@ -47,7 +55,7 @@ export default function Home() {
         } else {
           clientStorage.clearAuthToken()
         }
-      } catch (error) {
+      } catch {
         clientStorage.clearAuthToken()
       }
     }
@@ -78,7 +86,7 @@ export default function Home() {
         setAuthStatus('error')
         setAuthMessage(data.error || '요청 처리 중 오류가 발생했습니다.')
       }
-    } catch (error) {
+    } catch {
       setAuthStatus('error')
       setAuthMessage('네트워크 오류가 발생했습니다.')
     }
@@ -204,10 +212,16 @@ export default function Home() {
         // FormData 생성
         const formData = new FormData()
         formData.append('file', compressedFile)
+        formData.append('modelPriority', JSON.stringify([
+          modelPriority.first,
+          modelPriority.second,
+          modelPriority.third
+        ]))
 
         // API 호출 함수
         const callAPI = async () => {
           console.log(`🌐 [BIZSCAN] API 호출 시작: ${file.name}`)
+          console.log(`🎯 [BIZSCAN] 모델 순위: ${modelPriority.first} → ${modelPriority.second} → ${modelPriority.third}`)
           const startTime = Date.now()
           const response = await axios.post('/api/extract-single', formData, {
             headers: {
@@ -226,7 +240,33 @@ export default function Home() {
           if (response.data.success) {
             console.log(`✅ [BIZSCAN] 데이터 추출 성공: ${file.name}`)
             console.log(`📊 [BIZSCAN] 추출된 데이터:`, response.data.data)
-            results.push(response.data.data)
+            let processedData = response.data.data
+            
+            // 텍스트 검수 기능이 활성화되어 있으면 추가 검수 수행
+            if (enableTextReview) {
+              console.log(`🔍 [BIZSCAN] 텍스트 검수 시작: ${file.name}`)
+              try {
+                const reviewResponse = await fetch('/api/text-review', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ data: processedData })
+                })
+                
+                if (reviewResponse.ok) {
+                  const reviewResult = await reviewResponse.json()
+                  if (reviewResult.success && reviewResult.data.needsCorrection) {
+                    console.log(`🔧 [BIZSCAN] 텍스트 수정 적용: ${file.name}`)
+                    processedData = reviewResult.data.correctedData
+                  }
+                }
+              } catch (reviewError) {
+                console.log(`⚠️ [BIZSCAN] 텍스트 검수 실패: ${file.name}`, reviewError)
+              }
+            }
+            
+            results.push(processedData)
             setSuccessCount(prev => prev + 1)
             
             // 클라이언트 저장소에 저장
@@ -235,10 +275,10 @@ export default function Home() {
               id: `${Date.now()}_${i}`,
               fileName: file.name,
               data: {
-                대표자명: response.data.data.대표자명,
-                상호명: response.data.data.상호명,
-                사업자주소: response.data.data.사업자주소,
-                사업자등록번호: response.data.data.사업자등록번호
+                대표자명: processedData.대표자명,
+                상호명: processedData.상호명,
+                사업자주소: processedData.사업자주소,
+                사업자등록번호: processedData.사업자등록번호
               },
               confidence: 1,
               processedAt: new Date(),
@@ -263,17 +303,43 @@ export default function Home() {
               
               if (retryResponse.data.success) {
                 console.log(`✅ [BIZSCAN] 재시도 성공: ${file.name}`)
-                results.push(retryResponse.data.data)
+                let retryProcessedData = retryResponse.data.data
+                
+                // 텍스트 검수 기능이 활성화되어 있으면 추가 검수 수행
+                if (enableTextReview) {
+                  console.log(`🔍 [BIZSCAN] 재시도 텍스트 검수 시작: ${file.name}`)
+                  try {
+                    const reviewResponse = await fetch('/api/text-review', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ data: retryProcessedData })
+                    })
+                    
+                    if (reviewResponse.ok) {
+                      const reviewResult = await reviewResponse.json()
+                      if (reviewResult.success && reviewResult.data.needsCorrection) {
+                        console.log(`🔧 [BIZSCAN] 재시도 텍스트 수정 적용: ${file.name}`)
+                        retryProcessedData = reviewResult.data.correctedData
+                      }
+                    }
+                  } catch (reviewError) {
+                    console.log(`⚠️ [BIZSCAN] 재시도 텍스트 검수 실패: ${file.name}`, reviewError)
+                  }
+                }
+                
+                results.push(retryProcessedData)
                 setSuccessCount(prev => prev + 1)
                 
                 await clientStorage.saveResult({
                   id: `${Date.now()}_${i}`,
                   fileName: file.name,
                   data: {
-                    대표자명: retryResponse.data.data.대표자명,
-                    상호명: retryResponse.data.data.상호명,
-                    사업자주소: retryResponse.data.data.사업자주소,
-                    사업자등록번호: retryResponse.data.data.사업자등록번호
+                    대표자명: retryProcessedData.대표자명,
+                    상호명: retryProcessedData.상호명,
+                    사업자주소: retryProcessedData.사업자주소,
+                    사업자등록번호: retryProcessedData.사업자등록번호
                   },
                   confidence: 1,
                   processedAt: new Date(),
@@ -328,14 +394,45 @@ export default function Home() {
       // 처리 완료
       if (!cancelRef.current) {
         console.log(`🏁 [BIZSCAN] 모든 파일 처리 완료 - 성공: ${results.length}, 실패: ${failed.length}`)
+        
+        // 무한 재시도 모드이고 실패한 파일이 있으면 자동으로 재시도
+        if (infiniteRetryMode && failed.length > 0) {
+          setRetryCount(prev => prev + 1)
+          console.log(`🔄 [BIZSCAN] 무한 재시도 모드 - ${retryCount + 1}번째 재시도 시작 (실패 파일: ${failed.length}개)`)
+          
+          // 실패한 파일들만 다시 처리
+          const failedFileNames = new Set(failed.map(f => f.name))
+          const filesToRetry = files.filter(file => failedFileNames.has(file.name))
+          setFiles(filesToRetry)
+          setFailedFiles([])
+          
+          // 2초 후 자동으로 재시도 시작
+          setTimeout(() => {
+            if (!cancelRef.current) {
+              handleSubmit()
+            }
+          }, 2000)
+          return
+        }
+        
+        // 모든 파일 처리 완료 (성공 또는 재시도 중단)
         setStatus('generating')
         
         // 클라이언트에서 Excel 생성 (기존 데이터 + 새 데이터)
-        const finalResults = [...existingResults, ...results]
-        if (finalResults.length > 0) {
-          console.log(`📊 [BIZSCAN] Excel 생성 시작... (기존 ${existingResults.length}개 + 새로운 ${results.length}개 = 총 ${finalResults.length}개 데이터)`)
+        const combinedResults = [...existingResults, ...results]
+        
+        // 중복 제거 (사업자등록번호 기준)
+        const uniqueResults = removeDuplicates(combinedResults)
+        const duplicateCount = combinedResults.length - uniqueResults.length
+        
+        if (duplicateCount > 0) {
+          console.log(`🔄 [BIZSCAN] 중복 데이터 ${duplicateCount}개 제거됨`)
+        }
+        
+        if (uniqueResults.length > 0) {
+          console.log(`📊 [BIZSCAN] Excel 생성 시작... (기존 ${existingResults.length}개 + 새로운 ${results.length}개 → 중복제거 후 ${uniqueResults.length}개 데이터)`)
           const excelStartTime = Date.now()
-          const excelBlob = await generateExcelFromData(finalResults)
+          const excelBlob = await generateExcelFromData(uniqueResults)
           const excelDuration = Date.now() - excelStartTime
           console.log(`✅ [BIZSCAN] Excel 생성 완료 (소요시간: ${excelDuration}ms, 크기: ${excelBlob.size}bytes)`)
           setExcelBlob(excelBlob)
@@ -344,6 +441,13 @@ export default function Home() {
         }
         
         setStatus('success')
+        
+        // 모든 처리가 완료되면 알림음 재생
+        if (failed.length === 0) {
+          console.log(`🎉 [BIZSCAN] 모든 파일 처리 완료! 알림음 재생`)
+          playNotificationSound()
+        }
+        
         console.log(`🎉 [BIZSCAN] 전체 처리 완료!`)
       }
     } catch (error) {
@@ -376,6 +480,61 @@ export default function Home() {
     setFailedFiles([])
     // 성공한 데이터는 유지 (초기화 안함)
     setExcelBlob(null)
+    setRetryCount(0)
+  }
+
+  const handleInfiniteRetry = () => {
+    setInfiniteRetryMode(true)
+    setRetryCount(0)
+    handleRetryFailed()
+  }
+
+  const handleStopRetry = () => {
+    setInfiniteRetryMode(false)
+    cancelRef.current = true
+    setStatus('paused')
+  }
+
+  const removeDuplicates = (data: ExcelRowData[]) => {
+    const seen = new Set<string>()
+    const uniqueData: ExcelRowData[] = []
+    
+    for (const item of data) {
+      const key = item.businessRegistrationNumber || item.companyAndRepresentative
+      
+      if (!seen.has(key)) {
+        seen.add(key)
+        uniqueData.push(item)
+      } else {
+        console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
+      }
+    }
+    
+    return uniqueData
+  }
+
+  const playNotificationSound = () => {
+    try {
+      // 웹 오디오 API를 사용하여 알림음 생성
+      const audioContext = new (window.AudioContext || (window as typeof window & {webkitAudioContext: typeof AudioContext}).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1)
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2)
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+      
+      oscillator.start()
+      oscillator.stop(audioContext.currentTime + 0.3)
+    } catch (error) {
+      console.log('알림음 재생 실패:', error)
+    }
   }
 
   const handleDownload = () => {
@@ -595,15 +754,26 @@ export default function Home() {
 
             {/* 재시도 버튼 */}
             {status === 'success' && failedFiles.length > 0 && (
-              <Button 
-                onClick={handleRetryFailed}
-                variant="outline"
-                className="w-full h-14 text-lg mt-2"
-                size="lg"
-              >
-                <AlertCircle className="mr-2 h-5 w-5" />
-                실패한 {failedFiles.length}개 재시도
-              </Button>
+              <div className="space-y-2 mt-2">
+                <Button 
+                  onClick={handleRetryFailed}
+                  variant="outline"
+                  className="w-full h-14 text-lg"
+                  size="lg"
+                >
+                  <AlertCircle className="mr-2 h-5 w-5" />
+                  실패한 {failedFiles.length}개 재시도
+                </Button>
+                <Button 
+                  onClick={handleInfiniteRetry}
+                  variant="secondary"
+                  className="w-full h-14 text-lg bg-orange-100 hover:bg-orange-200 text-orange-800"
+                  size="lg"
+                >
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                  무한 재시도 모드 (모든 파일 성공까지)
+                </Button>
+              </div>
             )}
           </div>
 
@@ -611,21 +781,40 @@ export default function Home() {
           {(status === 'analyzing' || status === 'paused') && (
             <div className="space-y-4 bg-blue-50 p-6 rounded-lg border border-blue-200">
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium text-blue-900">
-                  처리 중: {currentFile} / {files.length} ({successCount} 성공, {failedFiles.length} 실패)
-                </p>
-                <Button
-                  onClick={handlePauseResume}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white"
-                >
-                  {status === 'paused' ? (
-                    <><Play className="h-4 w-4 mr-1" /> 재개</>
-                  ) : (
-                    <><Pause className="h-4 w-4 mr-1" /> 일시정지</>
+                <div className="flex flex-col">
+                  <p className="text-sm font-medium text-blue-900">
+                    처리 중: {currentFile} / {files.length} ({successCount} 성공, {failedFiles.length} 실패)
+                  </p>
+                  {infiniteRetryMode && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      🔄 무한 재시도 모드 (재시도 횟수: {retryCount})
+                    </p>
                   )}
-                </Button>
+                </div>
+                <div className="flex gap-2">
+                  {infiniteRetryMode && (
+                    <Button
+                      onClick={handleStopRetry}
+                      variant="outline"
+                      size="sm"
+                      className="bg-red-50 text-red-600 hover:bg-red-100"
+                    >
+                      <X className="h-4 w-4 mr-1" /> 중단
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handlePauseResume}
+                    variant="outline"
+                    size="sm"
+                    className="bg-white"
+                  >
+                    {status === 'paused' ? (
+                      <><Play className="h-4 w-4 mr-1" /> 재개</>
+                    ) : (
+                      <><Pause className="h-4 w-4 mr-1" /> 일시정지</>
+                    )}
+                  </Button>
+                </div>
               </div>
               <div className="w-full bg-blue-200 rounded-full h-4">
                 <div
@@ -661,6 +850,74 @@ export default function Home() {
               </div>
             </div>
           )}
+
+          {/* AI 모델 설정 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-gray-700">
+                  AI 텍스트 검수 (베타)
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  추출된 텍스트의 오타나 오류를 AI가 검수하고 수정합니다
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={enableTextReview}
+                  onChange={(e) => setEnableTextReview(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            {/* 모델 순위 설정 */}
+            <div className="border-t pt-4">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                이미지 분석 모델 순위 설정
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500">1순위</label>
+                  <select
+                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    value={modelPriority.first}
+                    onChange={(e) => setModelPriority({...modelPriority, first: e.target.value})}
+                  >
+                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash</option>
+                    <option value="qwen/qwen2.5-vl-72b-instruct:free">Qwen 2.5 VL</option>
+                    <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">2순위</label>
+                  <select
+                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    value={modelPriority.second}
+                    onChange={(e) => setModelPriority({...modelPriority, second: e.target.value})}
+                  >
+                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash</option>
+                    <option value="qwen/qwen2.5-vl-72b-instruct:free">Qwen 2.5 VL</option>
+                    <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">3순위</label>
+                  <select
+                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    value={modelPriority.third}
+                    onChange={(e) => setModelPriority({...modelPriority, third: e.target.value})}
+                  >
+                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash</option>
+                    <option value="qwen/qwen2.5-vl-72b-instruct:free">Qwen 2.5 VL</option>
+                    <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <FileDropzone 
             files={files} 
