@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const searchParams = useSearchParams()
   const [code, setCode] = useState('')
   const [token, setToken] = useState('')
@@ -71,5 +71,13 @@ export default function AuthCallback() {
         </button>
       </div>
     </div>
+  )
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AuthCallbackContent />
+    </Suspense>
   )
 }
