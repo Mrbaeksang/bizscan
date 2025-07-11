@@ -180,7 +180,7 @@ export default function Home() {
 
     // 클라이언트 저장소 초기화 (재시도가 아닌 경우만)
     let existingResults: ExcelRowData[] = []
-    let processedFileNames = new Set<string>()
+    const processedFileNames = new Set<string>()
     
     if (!isRetry) {
       console.log('🔄 [BIZSCAN] 클라이언트 저장소 초기화 중...')
@@ -595,10 +595,6 @@ export default function Home() {
   ) => {
     // 이미 처리된 파일들을 추적
     const processedFileNames = new Set<string>()
-    existingResults.forEach(result => {
-      // 파일명을 추출 (companyAndRepresentative에서 파일명을 역추적하기 어려우므로 다른 방법 사용)
-      // 대신 클라이언트 저장소에서 이미 처리된 파일들을 가져와서 추적
-    })
     
     // 클라이언트 저장소에서 이미 처리된 파일들을 가져오기
     const storedResults = await clientStorage.getResults()
@@ -837,7 +833,24 @@ export default function Home() {
 
   const playNotificationSound = () => {
     try {
-      // 웹 오디오 API를 사용하여 알림음 생성
+      // 커스텀 음성 파일 경로 (public 폴더에 있는 파일)
+      const customAudioPath = '/notification.mp3' // 원하는 파일명으로 변경
+      
+      const audio = new Audio(customAudioPath)
+      audio.volume = 0.7
+      audio.play().catch(error => {
+        console.log('커스텀 음성 재생 실패:', error)
+        // 커스텀 음성 실패 시 기본 알림음으로 대체
+        playDefaultNotificationSound()
+      })
+    } catch (error) {
+      console.log('알림음 재생 실패:', error)
+    }
+  }
+
+  const playDefaultNotificationSound = () => {
+    try {
+      // 웹 오디오 API를 사용하여 기본 알림음 생성
       const audioContext = new (window.AudioContext || (window as typeof window & {webkitAudioContext: typeof AudioContext}).webkitAudioContext)()
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()
@@ -855,9 +868,10 @@ export default function Home() {
       oscillator.start()
       oscillator.stop(audioContext.currentTime + 0.3)
     } catch (error) {
-      console.log('알림음 재생 실패:', error)
+      console.log('기본 알림음 재생 실패:', error)
     }
   }
+
 
   const handleDownload = () => {
     if (excelBlob) {
