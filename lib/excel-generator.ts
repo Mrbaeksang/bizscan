@@ -67,10 +67,9 @@ export async function generatePartialExcel(
   worksheet.addRow(['총 파일 수', totalCount])
   worksheet.addRow(['성공', successCount])
   worksheet.addRow(['실패', failedCount])
-  worksheet.addRow([]) // 빈 줄
 
   // 열 정의
-  const headerRow = 6
+  const headerRow = 5
   worksheet.getRow(headerRow).values = [
     '상호명(대표자명)',
     '오픈시간',

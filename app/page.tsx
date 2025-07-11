@@ -37,6 +37,14 @@ export default function Home() {
   const cancelRef = useRef(false)
   const [infiniteRetryMode, setInfiniteRetryMode] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [isResuming, setIsResuming] = useState(false)
+  const [pausedState, setPausedState] = useState<{
+    processedFiles: string[]
+    successfulResults: ExcelRowData[]
+    failedFiles: {name: string, error: string}[]
+    currentIndex: number
+    totalFiles: number
+  } | null>(null)
   const [reviewResults, setReviewResults] = useState<{
     duplicatesRemoved: Array<{companyName: string, businessNumber: string}>,
     textCorrections: Array<{fileName: string, field: string, original: string, corrected: string, reason: string}>,
@@ -157,6 +165,13 @@ export default function Home() {
     if (!isRetry) {
       setSuccessCount(0)
       setProcessedData([])
+      setReviewResults({
+        duplicatesRemoved: [],
+        textCorrections: [],
+        totalProcessed: 0,
+        totalDuplicates: 0,
+        totalCorrections: 0
+      })
     } else {
       console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 유지')
     }
@@ -165,6 +180,7 @@ export default function Home() {
 
     // 클라이언트 저장소 초기화 (재시도가 아닌 경우만)
     let existingResults: ExcelRowData[] = []
+    let processedFileNames = new Set<string>()
     
     if (!isRetry) {
       console.log('🔄 [BIZSCAN] 클라이언트 저장소 초기화 중...')
@@ -189,7 +205,11 @@ export default function Home() {
         사업자등록번호: r.data.사업자등록번호
       }))
       
+      // 이미 처리된 파일명들을 추적
+      successResults.forEach(r => processedFileNames.add(r.fileName))
+      
       console.log(`✅ [BIZSCAN] 기존 성공 데이터 ${existingResults.length}개 로드됨`)
+      console.log(`✅ [BIZSCAN] 이미 처리된 파일: ${Array.from(processedFileNames).join(', ')}`)
     }
 
     const totalFiles = files.length
@@ -208,6 +228,12 @@ export default function Home() {
         const file = files[i]
         console.log(`📝 [BIZSCAN] 파일 ${i + 1}/${files.length} 처리 시작: ${file.name}`)
         setCurrentFile(i + 1)
+        
+        // 이미 처리된 파일인지 확인
+        if (processedFileNames.has(file.name)) {
+          console.log(`⏭️ [BIZSCAN] 이미 처리된 파일 건너뛰기: ${file.name}`)
+          continue
+        }
         
         // 이미지 압축
         console.log(`🗜️ [BIZSCAN] 이미지 압축 중: ${file.name} (원본: ${file.size}bytes)`)
@@ -287,6 +313,9 @@ export default function Home() {
             results.push(processedData)
             setSuccessCount(prev => prev + 1)
             
+            // 처리된 파일명을 추적 목록에 추가
+            processedFileNames.add(file.name)
+            
             // 클라이언트 저장소에 저장
             console.log(`💾 [BIZSCAN] 클라이언트 저장소 저장 중: ${file.name}`)
             await clientStorage.saveResult({
@@ -365,6 +394,9 @@ export default function Home() {
                 results.push(retryProcessedData)
                 setSuccessCount(prev => prev + 1)
                 
+                // 처리된 파일명을 추적 목록에 추가
+                processedFileNames.add(file.name)
+                
                 await clientStorage.saveResult({
                   id: `${Date.now()}_${i}`,
                   fileName: file.name,
@@ -412,7 +444,7 @@ export default function Home() {
         console.log(`📊 [BIZSCAN] 진행률 업데이트: ${currentProgress}% (${i + 1}/${totalFiles})`)
         setProgress(currentProgress)
         
-        // 기존 데이터와 새 데이터 병합
+        // 기존 데이터와 새 데이터 병합 (중복 방지)
         const mergedData = [...existingResults, ...results]
         setProcessedData(mergedData)
         setFailedFiles([...failed])
@@ -501,13 +533,39 @@ export default function Home() {
 
   const handlePauseResume = () => {
     if (status === 'analyzing') {
+      // 일시정지: 현재 상태 저장
+      const currentResults = processedData
+      const currentFailed = failedFiles
+      const currentProcessed = files.filter((_, index) => index < currentFile).map(f => f.name)
+      
+      setPausedState({
+        processedFiles: currentProcessed,
+        successfulResults: currentResults,
+        failedFiles: currentFailed,
+        currentIndex: currentFile,
+        totalFiles: files.length
+      })
+      
       cancelRef.current = true
       setStatus('paused')
+      console.log(`⏸️ [BIZSCAN] 일시정지 - 진행: ${currentFile}/${files.length} (성공: ${currentResults.length}, 실패: ${currentFailed.length})`)
     } else if (status === 'paused') {
+      // 재개: 저장된 상태에서 계속
+      setIsResuming(true)
       cancelRef.current = false
       setStatus('analyzing')
-      // 재개 로직은 복잡하므로 다시 시작하도록 유도
-      handleSubmit()
+      
+      if (pausedState) {
+        console.log(`▶️ [BIZSCAN] 재개 - 저장된 상태: ${pausedState.currentIndex}/${pausedState.totalFiles}`)
+        // 미처리 파일들만 다시 처리
+        const remainingFiles = files.slice(pausedState.currentIndex)
+        continueProcessing(remainingFiles, pausedState.successfulResults, pausedState.failedFiles, pausedState.currentIndex)
+      } else {
+        handleSubmit()
+      }
+      
+      // 재개 상태 초기화
+      setTimeout(() => setIsResuming(false), 1000)
     }
   }
 
@@ -527,6 +585,198 @@ export default function Home() {
     setInfiniteRetryMode(false)
     cancelRef.current = true
     setStatus('paused')
+  }
+
+  const continueProcessing = async (
+    remainingFiles: File[], 
+    existingResults: ExcelRowData[], 
+    existingFailed: {name: string, error: string}[], 
+    startIndex: number
+  ) => {
+    // 이미 처리된 파일들을 추적
+    const processedFileNames = new Set<string>()
+    existingResults.forEach(result => {
+      // 파일명을 추출 (companyAndRepresentative에서 파일명을 역추적하기 어려우므로 다른 방법 사용)
+      // 대신 클라이언트 저장소에서 이미 처리된 파일들을 가져와서 추적
+    })
+    
+    // 클라이언트 저장소에서 이미 처리된 파일들을 가져오기
+    const storedResults = await clientStorage.getResults()
+    const successResults = storedResults.filter(r => r.status === 'success')
+    successResults.forEach(r => processedFileNames.add(r.fileName))
+    try {
+      const results: ExcelRowData[] = []
+      const failed: {name: string, error: string}[] = []
+      const totalFiles = files.length
+      
+      console.log(`🔄 [BIZSCAN] 재개 처리 시작 - 남은 파일: ${remainingFiles.length}개`)
+      
+      for (let i = 0; i < remainingFiles.length; i++) {
+        if (cancelRef.current) {
+          console.log(`⏸️ [BIZSCAN] 재개 처리 중 일시정지됨`)
+          break
+        }
+        
+        const file = remainingFiles[i]
+        const actualIndex = startIndex + i
+        setCurrentFile(actualIndex + 1)
+        
+        // 이미 처리된 파일인지 확인
+        if (processedFileNames.has(file.name)) {
+          console.log(`⏭️ [BIZSCAN] 재개 처리 중 이미 처리된 파일 건너뛰기: ${file.name}`)
+          continue
+        }
+        
+        // 파일 처리 로직 (기존과 동일)
+        const compressedFile = await compressImage(file, {
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 0.6
+        })
+        
+        const formData = new FormData()
+        formData.append('file', compressedFile)
+        
+        const callAPI = async () => {
+          console.log(`🌐 [BIZSCAN] 재개 API 호출: ${file.name}`)
+          const response = await axios.post('/api/extract-single', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000
+          })
+          return response
+        }
+        
+        try {
+          const response = await callAPI()
+          
+          if (response.data.success) {
+            console.log(`✅ [BIZSCAN] 재개 처리 성공: ${file.name}`)
+            let processedData = response.data.data
+            
+            // 텍스트 검수 (기존과 동일)
+            try {
+              const reviewResponse = await fetch('/api/text-review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: processedData })
+              })
+              
+              if (reviewResponse.ok) {
+                const reviewResult = await reviewResponse.json()
+                if (reviewResult.success && reviewResult.data.needsCorrection) {
+                  processedData = reviewResult.data.correctedData
+                  
+                  if (reviewResult.data.corrections && reviewResult.data.corrections.length > 0) {
+                    const corrections = reviewResult.data.corrections.map((correction: {field: string, original: string, corrected: string, reason: string}) => ({
+                      fileName: file.name,
+                      field: correction.field,
+                      original: correction.original,
+                      corrected: correction.corrected,
+                      reason: correction.reason
+                    }))
+                    
+                    setReviewResults(prev => ({
+                      ...prev,
+                      textCorrections: [...prev.textCorrections, ...corrections],
+                      totalCorrections: prev.totalCorrections + corrections.length
+                    }))
+                  }
+                }
+              }
+            } catch (reviewError) {
+              console.log(`⚠️ [BIZSCAN] 재개 텍스트 검수 실패: ${file.name}`, reviewError)
+            }
+            
+            results.push(processedData)
+            setSuccessCount(prev => prev + 1)
+            
+            // 처리된 파일명을 추적 목록에 추가
+            processedFileNames.add(file.name)
+            
+            // 클라이언트 저장소에 저장
+            await clientStorage.saveResult({
+              id: `${Date.now()}_${actualIndex}`,
+              fileName: file.name,
+              data: {
+                대표자명: processedData.대표자명,
+                상호명: processedData.상호명,
+                사업자주소: processedData.사업자주소,
+                사업자등록번호: processedData.사업자등록번호
+              },
+              confidence: 1,
+              processedAt: new Date(),
+              status: 'success'
+            })
+          } else {
+            throw new Error(response.data.error || '처리 실패')
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
+          console.error(`❌ [BIZSCAN] 재개 처리 실패: ${file.name}`, error)
+          failed.push({ name: file.name, error: errorMessage })
+        }
+        
+        // 진행률 업데이트 (이미 처리된 파일 + 현재 처리 중인 파일)
+        const currentProgress = Math.round(((actualIndex + 1) / totalFiles) * 100)
+        setProgress(currentProgress)
+        console.log(`📊 [BIZSCAN] 재개 진행률: ${currentProgress}% (${actualIndex + 1}/${totalFiles})`)
+        
+        // 기존 데이터와 새 데이터 병합 (중복 방지)
+        const mergedData = [...existingResults, ...results]
+        setProcessedData(mergedData)
+        setFailedFiles([...existingFailed, ...failed])
+        
+        // 2초 대기
+        if (i < remainingFiles.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      }
+      
+      // 처리 완료
+      if (!cancelRef.current) {
+        console.log(`🏁 [BIZSCAN] 재개 처리 완료`)
+        
+        // 최종 결과 처리
+        const finalResults = [...existingResults, ...results]
+        const finalFailed = [...existingFailed, ...failed]
+        
+        if (finalFailed.length > 0) {
+          // 자동 무한 재시도 시작
+          setInfiniteRetryMode(true)
+          setRetryCount(prev => prev + 1)
+          
+          const failedFileNames = new Set(finalFailed.map(f => f.name))
+          const filesToRetry = files.filter(file => failedFileNames.has(file.name))
+          setFiles(filesToRetry)
+          setFailedFiles([])
+          
+          setTimeout(() => {
+            if (!cancelRef.current) {
+              handleSubmit()
+            }
+          }, 2000)
+          return
+        }
+        
+        // 모든 파일 성공
+        setStatus('generating')
+        
+        const uniqueResults = removeDuplicates(finalResults)
+        if (uniqueResults.length > 0) {
+          const excelBlob = await generateExcelFromData(uniqueResults)
+          setExcelBlob(excelBlob)
+        }
+        
+        setStatus('success')
+        playNotificationSound()
+      }
+      
+      setPausedState(null)
+    } catch (error) {
+      console.error('재개 처리 중 오류:', error)
+      setStatus('error')
+      setPausedState(null)
+    }
   }
 
   const removeDuplicates = (data: ExcelRowData[]) => {
@@ -877,9 +1127,17 @@ export default function Home() {
                     variant="outline"
                     size="sm"
                     className="bg-white"
+                    disabled={isResuming}
                   >
                     {status === 'paused' ? (
-                      <><Play className="h-4 w-4 mr-1" /> 재개</>
+                      isResuming ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-1" />
+                          재개 중...
+                        </>
+                      ) : (
+                        <><Play className="h-4 w-4 mr-1" /> 재개</>
+                      )
                     ) : (
                       <><Pause className="h-4 w-4 mr-1" /> 일시정지</>
                     )}
