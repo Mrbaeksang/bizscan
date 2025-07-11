@@ -179,17 +179,22 @@ export default function Home() {
           const formData = new FormData()
           formData.append('file', compressedFile)
 
-          // API 호출
-          console.log(`🌐 [BIZSCAN] API 호출 시작: ${file.name}`)
-          const startTime = Date.now()
-          const response = await axios.post('/api/extract-single', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            },
-            timeout: 30000
-          })
-          const duration = Date.now() - startTime
-          console.log(`✅ [BIZSCAN] API 응답 받음: ${file.name} (소요시간: ${duration}ms)`)
+          // API 호출 함수
+          const callAPI = async () => {
+            console.log(`🌐 [BIZSCAN] API 호출 시작: ${file.name}`)
+            const startTime = Date.now()
+            const response = await axios.post('/api/extract-single', formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data'
+              },
+              timeout: 30000
+            })
+            const duration = Date.now() - startTime
+            console.log(`✅ [BIZSCAN] API 응답 받음: ${file.name} (소요시간: ${duration}ms)`)
+            return response
+          }
+
+          const response = await callAPI()
 
           if (response.data.success) {
             console.log(`✅ [BIZSCAN] 데이터 추출 성공: ${file.name}`)
@@ -227,12 +232,7 @@ export default function Home() {
             await new Promise(resolve => setTimeout(resolve, 3000)) // 3초 대기
             
             try {
-              const retryResponse = await axios.post('/api/extract-single', formData, {
-                headers: {
-                  'Content-Type': 'multipart/form-data'
-                },
-                timeout: 30000
-              })
+              const retryResponse = await callAPI()
               
               if (retryResponse.data.success) {
                 console.log(`✅ [BIZSCAN] 재시도 성공: ${file.name}`)
