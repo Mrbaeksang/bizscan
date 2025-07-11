@@ -217,6 +217,7 @@ export default function Home() {
     const totalFiles = files.length
     const results: ExcelRowData[] = []
     const failed: {name: string, error: string}[] = []
+    const rawResults: ExcelRowData[] = []
 
     try {
       // 각 파일을 순차적으로 처리
@@ -276,6 +277,7 @@ export default function Home() {
             // 개별 텍스트 검수 제거 - 일괄 검수로 대체
             
             results.push(processedData)
+            rawResults.push(processedData)
             setSuccessCount(prev => prev + 1)
             
             // 원본 데이터 저장 (딥시크 검수 전)
@@ -323,6 +325,7 @@ export default function Home() {
                 // 재시도 시에도 개별 텍스트 검수 제거
                 
                 results.push(retryProcessedData)
+                rawResults.push(retryProcessedData)
                 setSuccessCount(prev => prev + 1)
                 
                 // 원본 데이터 저장 (딥시크 검수 전)
@@ -416,8 +419,8 @@ export default function Home() {
         }
         
         // 모든 파일 처리 완료 시 자동 일괄 검수
-        if (rawProcessedData.length > 0) {
-          await performBulkReview()
+        if (rawResults.length > 0) {
+          await performBulkReview(rawResults)
         } else {
           setStatus('success')
         }
@@ -476,9 +479,10 @@ export default function Home() {
     }
   }
 
-  const performBulkReview = async () => {
+  const performBulkReview = async (dataToReview?: ExcelRowData[]) => {
     setIsBulkReviewing(true)
-    console.log(`🔍 [BIZSCAN] AI 검수 시작 - ${rawProcessedData.length}개 데이터`)
+    const reviewData = dataToReview || rawProcessedData
+    console.log(`🔍 [BIZSCAN] AI 검수 시작 - ${reviewData.length}개 데이터`)
     
     try {
       const response = await fetch('/api/bulk-review-excel', {
@@ -486,7 +490,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ rawData: rawProcessedData })
+        body: JSON.stringify({ rawData: reviewData })
       })
       
       if (response.ok) {
@@ -1104,7 +1108,7 @@ export default function Home() {
           <FileDropzone 
             files={files} 
             onFilesChange={setFiles}
-            disabled={status === 'analyzing' || status === 'generating'}
+            disabled={status === 'analyzing' || status === 'generating' || status === 'paused' || isBulkReviewing}
           />
 
           {status === 'error' && (
