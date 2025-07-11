@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Mail, RefreshCw, X, Trash2 } from 'lucide-react'
 import { compressImage } from '@/lib/image-utils'
 import { clientStorage } from '@/lib/client-storage'
-import { generateExcelFromData, generatePartialExcel } from '@/lib/excel-generator'
+import { generateExcelFromData } from '@/lib/excel-generator'
 import type { ExcelRowData } from '@/lib/excel-generator'
 
 type Status = 'idle' | 'uploading' | 'analyzing' | 'generating' | 'success' | 'error' | 'paused'
