@@ -5,6 +5,7 @@ import axios from 'axios'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
 import { LivePreviewModal } from '@/components/live-preview-modal'
+import { ReviewResultsModal } from '@/components/review-results-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Table, Mail, RefreshCw, X } from 'lucide-react'
@@ -36,6 +37,20 @@ export default function Home() {
   const cancelRef = useRef(false)
   const [infiniteRetryMode, setInfiniteRetryMode] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [reviewResults, setReviewResults] = useState<{
+    duplicatesRemoved: Array<{companyName: string, businessNumber: string}>,
+    textCorrections: Array<{fileName: string, field: string, original: string, corrected: string, reason: string}>,
+    totalProcessed: number,
+    totalDuplicates: number,
+    totalCorrections: number
+  }>({
+    duplicatesRemoved: [],
+    textCorrections: [],
+    totalProcessed: 0,
+    totalDuplicates: 0,
+    totalCorrections: 0
+  })
+  const [showReviewResults, setShowReviewResults] = useState(false)
 
   // 인증 상태 확인
   useEffect(() => {
@@ -246,6 +261,23 @@ export default function Home() {
                 if (reviewResult.success && reviewResult.data.needsCorrection) {
                   console.log(`🔧 [BIZSCAN] 텍스트 수정 적용: ${file.name}`)
                   processedData = reviewResult.data.correctedData
+                  
+                  // 검수 결과 저장
+                  if (reviewResult.data.corrections && reviewResult.data.corrections.length > 0) {
+                    const corrections = reviewResult.data.corrections.map((correction: {field: string, original: string, corrected: string, reason: string}) => ({
+                      fileName: file.name,
+                      field: correction.field,
+                      original: correction.original,
+                      corrected: correction.corrected,
+                      reason: correction.reason
+                    }))
+                    
+                    setReviewResults(prev => ({
+                      ...prev,
+                      textCorrections: [...prev.textCorrections, ...corrections],
+                      totalCorrections: prev.totalCorrections + corrections.length
+                    }))
+                  }
                 }
               }
             } catch (reviewError) {
@@ -307,6 +339,23 @@ export default function Home() {
                     if (reviewResult.success && reviewResult.data.needsCorrection) {
                       console.log(`🔧 [BIZSCAN] 재시도 텍스트 수정 적용: ${file.name}`)
                       retryProcessedData = reviewResult.data.correctedData
+                      
+                      // 검수 결과 저장
+                      if (reviewResult.data.corrections && reviewResult.data.corrections.length > 0) {
+                        const corrections = reviewResult.data.corrections.map((correction: {field: string, original: string, corrected: string, reason: string}) => ({
+                          fileName: file.name,
+                          field: correction.field,
+                          original: correction.original,
+                          corrected: correction.corrected,
+                          reason: correction.reason
+                        }))
+                        
+                        setReviewResults(prev => ({
+                          ...prev,
+                          textCorrections: [...prev.textCorrections, ...corrections],
+                          totalCorrections: prev.totalCorrections + corrections.length
+                        }))
+                      }
                     }
                   }
                 } catch (reviewError) {
@@ -413,6 +462,12 @@ export default function Home() {
         if (duplicateCount > 0) {
           console.log(`🔄 [BIZSCAN] 중복 데이터 ${duplicateCount}개 제거됨`)
         }
+
+        // 처리된 파일 수 업데이트
+        setReviewResults(prev => ({
+          ...prev,
+          totalProcessed: prev.totalProcessed + files.length
+        }))
         
         if (uniqueResults.length > 0) {
           console.log(`📊 [BIZSCAN] Excel 생성 시작... (기존 ${existingResults.length}개 + 새로운 ${results.length}개 → 중복제거 후 ${uniqueResults.length}개 데이터)`)
@@ -477,6 +532,7 @@ export default function Home() {
   const removeDuplicates = (data: ExcelRowData[]) => {
     const seen = new Set<string>()
     const uniqueData: ExcelRowData[] = []
+    const duplicatesRemoved: Array<{companyName: string, businessNumber: string}> = []
     
     for (const item of data) {
       const key = item.businessRegistrationNumber || item.companyAndRepresentative
@@ -486,7 +542,20 @@ export default function Home() {
         uniqueData.push(item)
       } else {
         console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
+        duplicatesRemoved.push({
+          companyName: item.companyAndRepresentative,
+          businessNumber: item.businessRegistrationNumber
+        })
       }
+    }
+    
+    // 검수 결과 업데이트
+    if (duplicatesRemoved.length > 0) {
+      setReviewResults(prev => ({
+        ...prev,
+        duplicatesRemoved: [...prev.duplicatesRemoved, ...duplicatesRemoved],
+        totalDuplicates: prev.totalDuplicates + duplicatesRemoved.length
+      }))
     }
     
     return uniqueData
@@ -717,6 +786,15 @@ export default function Home() {
                   <Table className="mr-2 h-5 w-5" />
                   데이터 미리보기
                 </Button>
+                <Button 
+                  onClick={() => setShowReviewResults(true)}
+                  variant="outline"
+                  className="h-14 text-lg px-6"
+                  size="lg"
+                >
+                  <CheckCircle2 className="mr-2 h-5 w-5" />
+                  검수 결과 보기
+                </Button>
                 {failedFiles.length > 0 && (
                   <Button 
                     onClick={() => setShowFailedFilesModal(true)}
@@ -876,6 +954,13 @@ export default function Home() {
           open={showLivePreview}
           onClose={() => setShowLivePreview(false)}
           isProcessing={status === 'analyzing' || status === 'generating'}
+        />
+
+        {/* 검수 결과 모달 */}
+        <ReviewResultsModal
+          open={showReviewResults}
+          onClose={() => setShowReviewResults(false)}
+          reviewResults={reviewResults}
         />
       </div>
     </main>
