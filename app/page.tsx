@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Mail, RefreshCw, X, Trash2 } from 'lucide-react'
 import { compressImage } from '@/lib/image-utils'
 import { clientStorage } from '@/lib/client-storage'
-import { generateExcelFromData } from '@/lib/excel-generator'
 import type { ExcelRowData } from '@/lib/excel-generator'
 
 type Status = 'idle' | 'uploading' | 'analyzing' | 'generating' | 'success' | 'error' | 'paused'
@@ -598,41 +597,9 @@ export default function Home() {
           
           if (response.data.success) {
             console.log(`✅ [BIZSCAN] 재개 처리 성공: ${file.name}`)
-            let processedData = response.data.data
+            const processedData = response.data.data
             
-            // 텍스트 검수 (기존과 동일)
-            try {
-              const reviewResponse = await fetch('/api/text-review', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: processedData })
-              })
-              
-              if (reviewResponse.ok) {
-                const reviewResult = await reviewResponse.json()
-                if (reviewResult.success && reviewResult.data.needsCorrection) {
-                  processedData = reviewResult.data.correctedData
-                  
-                  if (reviewResult.data.corrections && reviewResult.data.corrections.length > 0) {
-                    const corrections = reviewResult.data.corrections.map((correction: {field: string, original: string, corrected: string, reason: string}) => ({
-                      fileName: file.name,
-                      field: correction.field,
-                      original: correction.original,
-                      corrected: correction.corrected,
-                      reason: correction.reason
-                    }))
-                    
-                    setReviewResults(prev => ({
-                      ...prev,
-                      textCorrections: [...prev.textCorrections, ...corrections],
-                      totalCorrections: prev.totalCorrections + corrections.length
-                    }))
-                  }
-                }
-              }
-            } catch (reviewError) {
-              console.log(`⚠️ [BIZSCAN] 재개 텍스트 검수 실패: ${file.name}`, reviewError)
-            }
+            // 재개 처리에서도 개별 텍스트 검수 제거
             
             results.push(processedData)
             setSuccessCount(prev => prev + 1)
@@ -684,7 +651,6 @@ export default function Home() {
         console.log(`🏁 [BIZSCAN] 재개 처리 완료`)
         
         // 최종 결과 처리
-        const finalResults = [...existingResults, ...results]
         const finalFailed = [...existingFailed, ...failed]
         
         if (finalFailed.length > 0) {
@@ -705,17 +671,12 @@ export default function Home() {
           return
         }
         
-        // 모든 파일 성공
-        setStatus('generating')
-        
-        const uniqueResults = removeDuplicates(finalResults)
-        if (uniqueResults.length > 0) {
-          const excelBlob = await generateExcelFromData(uniqueResults)
-          setExcelBlob(excelBlob)
+        // 모든 파일 성공 - 일괄 검수 수행
+        if (rawProcessedData.length > 0) {
+          await performBulkReview()
+        } else {
+          setStatus('success')
         }
-        
-        setStatus('success')
-        playNotificationSound()
       }
       
       setPausedState(null)
@@ -726,61 +687,6 @@ export default function Home() {
     }
   }
 
-  const removeDuplicates = (data: ExcelRowData[]) => {
-    const seen = new Map<string, ExcelRowData>()
-    const uniqueData: ExcelRowData[] = []
-    const duplicatesRemoved: Array<{companyName: string, businessNumber: string}> = []
-    
-    for (const item of data) {
-      const businessNumber = item.businessRegistrationNumber?.trim()
-      
-      if (businessNumber && businessNumber !== '') {
-        // 사업자등록번호가 있는 경우
-        if (seen.has(businessNumber)) {
-          const existingItem = seen.get(businessNumber)!
-          // 상호명까지 비교하여 완전히 같은 경우만 중복으로 처리
-          if (existingItem.companyAndRepresentative === item.companyAndRepresentative) {
-            console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
-            duplicatesRemoved.push({
-              companyName: item.companyAndRepresentative,
-              businessNumber: item.businessRegistrationNumber
-            })
-            continue // 중복이므로 추가하지 않음
-          }
-        }
-        
-        seen.set(businessNumber, item)
-        uniqueData.push(item)
-      } else {
-        // 사업자등록번호가 없는 경우 상호명으로만 비교
-        const companyKey = item.companyAndRepresentative?.trim()
-        if (companyKey && !seen.has(companyKey)) {
-          seen.set(companyKey, item)
-          uniqueData.push(item)
-        } else if (companyKey && seen.has(companyKey)) {
-          console.log(`🔄 [BIZSCAN] 중복 제거 (상호명 기준): ${item.companyAndRepresentative}`)
-          duplicatesRemoved.push({
-            companyName: item.companyAndRepresentative,
-            businessNumber: item.businessRegistrationNumber || '없음'
-          })
-        } else {
-          // 사업자등록번호도 상호명도 없는 경우 그냥 추가
-          uniqueData.push(item)
-        }
-      }
-    }
-    
-    // 검수 결과 업데이트
-    if (duplicatesRemoved.length > 0) {
-      setReviewResults(prev => ({
-        ...prev,
-        duplicatesRemoved: [...prev.duplicatesRemoved, ...duplicatesRemoved],
-        totalDuplicates: prev.totalDuplicates + duplicatesRemoved.length
-      }))
-    }
-    
-    return uniqueData
-  }
 
   const playNotificationSound = () => {
     try {
