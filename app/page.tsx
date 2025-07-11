@@ -165,35 +165,35 @@ export default function Home() {
         console.log(`📝 [BIZSCAN] 파일 ${i + 1}/${files.length} 처리 시작: ${file.name}`)
         setCurrentFile(i + 1)
         
-        try {
-          // 이미지 압축
-          console.log(`🗜️ [BIZSCAN] 이미지 압축 중: ${file.name} (원본: ${file.size}bytes)`)
-          const compressedFile = await compressImage(file, {
-            maxWidth: 800,
-            maxHeight: 800,
-            quality: 0.6
+        // 이미지 압축
+        console.log(`🗜️ [BIZSCAN] 이미지 압축 중: ${file.name} (원본: ${file.size}bytes)`)
+        const compressedFile = await compressImage(file, {
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 0.6
+        })
+        console.log(`✅ [BIZSCAN] 압축 완료: ${compressedFile.size}bytes (${Math.round((1 - compressedFile.size/file.size) * 100)}% 감소)`)
+
+        // FormData 생성
+        const formData = new FormData()
+        formData.append('file', compressedFile)
+
+        // API 호출 함수
+        const callAPI = async () => {
+          console.log(`🌐 [BIZSCAN] API 호출 시작: ${file.name}`)
+          const startTime = Date.now()
+          const response = await axios.post('/api/extract-single', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
+            timeout: 30000
           })
-          console.log(`✅ [BIZSCAN] 압축 완료: ${compressedFile.size}bytes (${Math.round((1 - compressedFile.size/file.size) * 100)}% 감소)`)
+          const duration = Date.now() - startTime
+          console.log(`✅ [BIZSCAN] API 응답 받음: ${file.name} (소요시간: ${duration}ms)`)
+          return response
+        }
 
-          // FormData 생성
-          const formData = new FormData()
-          formData.append('file', compressedFile)
-
-          // API 호출 함수
-          const callAPI = async () => {
-            console.log(`🌐 [BIZSCAN] API 호출 시작: ${file.name}`)
-            const startTime = Date.now()
-            const response = await axios.post('/api/extract-single', formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data'
-              },
-              timeout: 30000
-            })
-            const duration = Date.now() - startTime
-            console.log(`✅ [BIZSCAN] API 응답 받음: ${file.name} (소요시간: ${duration}ms)`)
-            return response
-          }
-
+        try {
           const response = await callAPI()
 
           if (response.data.success) {
