@@ -33,7 +33,7 @@ interface ExtractedData {
   사업자등록번호: string
 }
 
-async function extractInfoFromImage(imageBuffer: Buffer, customModels?: string[]): Promise<ExtractedData> {
+async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData> {
   const apiKeys = process.env.OPENROUTER_API_KEY?.split(',').map(key => key.trim()) || []
   const primaryApiKey = apiKeys[0] || process.env.OPENROUTER_API_KEY
   
@@ -43,12 +43,8 @@ async function extractInfoFromImage(imageBuffer: Buffer, customModels?: string[]
 
   const base64Image = imageBuffer.toString('base64')
 
-  // 모델 순위 설정 (커스텀 모델 순위가 있으면 사용, 없으면 기본값)
-  const models = customModels || [
-    'google/gemini-2.0-flash-exp:free',     // 기본 1순위
-    'qwen/qwen2.5-vl-72b-instruct:free',    // 기본 2순위
-    'mistralai/mistral-small-3.2-24b-instruct:free'  // 기본 3순위
-  ]
+  // 단일 모델 사용
+  const models = ['google/gemini-flash-1.5-8b']
   
   console.log(`🎯 [BIZSCAN] 사용할 모델 순위: ${models.join(' → ')}`)
 
@@ -154,7 +150,6 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File
-    const modelPriorityStr = formData.get('modelPriority') as string
     
     if (!file) {
       return NextResponse.json(
@@ -163,21 +158,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 모델 순위 파싱
-    let customModels: string[] | undefined
-    if (modelPriorityStr) {
-      try {
-        const parsed = JSON.parse(modelPriorityStr)
-        if (Array.isArray(parsed) && parsed.length === 3) {
-          customModels = parsed
-        }
-      } catch {
-        console.log('모델 순위 파싱 실패, 기본값 사용')
-      }
-    }
-
     const buffer = Buffer.from(await file.arrayBuffer())
-    const data = await extractInfoFromImage(buffer, customModels)
+    const data = await extractInfoFromImage(buffer)
     
     // 성공한 데이터 변환
     const mappedData = {

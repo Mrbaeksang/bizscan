@@ -93,12 +93,8 @@ ${index + 1}. 상호명: ${data.companyAndRepresentative}
 }
 `
 
-  // 텍스트 검수 모델 순위 (1순위 → 2순위 → 3순위)
-  const textModels = [
-    'deepseek/deepseek-chat-v3-0324:free',  // 1순위
-    'deepseek/deepseek-r1-0528:free',       // 2순위
-    'deepseek/deepseek-r1:free'             // 3순위
-  ]
+  // 단일 텍스트 모델 사용
+  const textModels = ['meta-llama/llama-3.2-3b-instruct']
 
   for (const model of textModels) {
     try {
