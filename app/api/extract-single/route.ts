@@ -98,6 +98,7 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
         }
         
         const content = data.choices[0].message.content
+        console.log('🔍 [BIZSCAN] 제미나이 원본 응답:', content)
         
         // JSON 파싱 (마크다운 코드 블록 제거)
         let cleanContent = content
@@ -108,8 +109,11 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
           cleanContent = content.replace(/```\s*/g, '').trim()
         }
         
+        console.log('🧹 [BIZSCAN] 정리된 JSON:', cleanContent)
+        
         // eslint-disable-next-line prefer-const
         let extractedData = JSON.parse(cleanContent) as ExtractedData
+        console.log('📝 [BIZSCAN] 파싱된 데이터:', extractedData)
 
         // 사업자등록번호 형식 정규화
         if (extractedData.사업자등록번호) {

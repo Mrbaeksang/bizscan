@@ -404,15 +404,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* 파일 업로드 */}
-          <FileDropzone 
-            files={files} 
-            onFilesChange={setFiles}
-            disabled={status === 'processing'}
-          />
-
           {/* 버튼들 */}
-          <div className="flex flex-wrap gap-4 mt-6">
+          <div className="flex flex-wrap gap-4 mb-6">
             {/* 시작 버튼 */}
             {status === 'idle' && (
               <Button 
@@ -441,10 +434,10 @@ export default function Home() {
             )}
 
             {/* 다운로드 버튼 */}
-            {(status === 'paused' || status === 'completed') && excelBlob && (
-              <Button onClick={downloadExcel} className="flex-1">
+            {(status === 'paused' || status === 'completed') && successData.length > 0 && (
+              <Button onClick={excelBlob ? downloadExcel : () => generateExcel(successData)} className="flex-1">
                 <Download className="w-4 h-4 mr-2" />
-                엑셀 다운로드 ({successData.length}개)
+                {excelBlob ? '엑셀 다운로드' : '엑셀 생성'} ({successData.length}개)
               </Button>
             )}
 
@@ -480,6 +473,13 @@ export default function Home() {
               초기화
             </Button>
           </div>
+
+          {/* 파일 업로드 */}
+          <FileDropzone 
+            files={files} 
+            onFilesChange={setFiles}
+            disabled={status === 'processing'}
+          />
 
           {/* 엑셀 생성 중 */}
           {isGenerating && (

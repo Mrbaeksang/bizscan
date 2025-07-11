@@ -43,10 +43,11 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('엑셀 생성 중 오류:', error)
+    console.error('❌ [BIZSCAN] 엑셀 생성 중 오류:', error)
+    console.error('❌ [BIZSCAN] 오류 스택:', error instanceof Error ? error.stack : 'No stack trace')
     return NextResponse.json({ 
       success: false, 
-      error: '엑셀 생성 중 오류가 발생했습니다.' 
+      error: `엑셀 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}` 
     })
   }
 }
