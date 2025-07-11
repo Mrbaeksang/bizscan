@@ -36,12 +36,6 @@ export default function Home() {
   const cancelRef = useRef(false)
   const [infiniteRetryMode, setInfiniteRetryMode] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [enableTextReview, setEnableTextReview] = useState(false)
-  const [modelPriority, setModelPriority] = useState({
-    first: 'google/gemini-2.0-flash-exp:free',
-    second: 'qwen/qwen2.5-vl-72b-instruct:free',
-    third: 'mistralai/mistral-small-3.2-24b-instruct:free'
-  })
 
   // 인증 상태 확인
   useEffect(() => {
@@ -212,16 +206,10 @@ export default function Home() {
         // FormData 생성
         const formData = new FormData()
         formData.append('file', compressedFile)
-        formData.append('modelPriority', JSON.stringify([
-          modelPriority.first,
-          modelPriority.second,
-          modelPriority.third
-        ]))
 
         // API 호출 함수
         const callAPI = async () => {
           console.log(`🌐 [BIZSCAN] API 호출 시작: ${file.name}`)
-          console.log(`🎯 [BIZSCAN] 모델 순위: ${modelPriority.first} → ${modelPriority.second} → ${modelPriority.third}`)
           const startTime = Date.now()
           const response = await axios.post('/api/extract-single', formData, {
             headers: {
@@ -242,28 +230,26 @@ export default function Home() {
             console.log(`📊 [BIZSCAN] 추출된 데이터:`, response.data.data)
             let processedData = response.data.data
             
-            // 텍스트 검수 기능이 활성화되어 있으면 추가 검수 수행
-            if (enableTextReview) {
-              console.log(`🔍 [BIZSCAN] 텍스트 검수 시작: ${file.name}`)
-              try {
-                const reviewResponse = await fetch('/api/text-review', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ data: processedData })
-                })
-                
-                if (reviewResponse.ok) {
-                  const reviewResult = await reviewResponse.json()
-                  if (reviewResult.success && reviewResult.data.needsCorrection) {
-                    console.log(`🔧 [BIZSCAN] 텍스트 수정 적용: ${file.name}`)
-                    processedData = reviewResult.data.correctedData
-                  }
+            // 텍스트 검수 기능 (항상 활성화)
+            console.log(`🔍 [BIZSCAN] 텍스트 검수 시작: ${file.name}`)
+            try {
+              const reviewResponse = await fetch('/api/text-review', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ data: processedData })
+              })
+              
+              if (reviewResponse.ok) {
+                const reviewResult = await reviewResponse.json()
+                if (reviewResult.success && reviewResult.data.needsCorrection) {
+                  console.log(`🔧 [BIZSCAN] 텍스트 수정 적용: ${file.name}`)
+                  processedData = reviewResult.data.correctedData
                 }
-              } catch (reviewError) {
-                console.log(`⚠️ [BIZSCAN] 텍스트 검수 실패: ${file.name}`, reviewError)
               }
+            } catch (reviewError) {
+              console.log(`⚠️ [BIZSCAN] 텍스트 검수 실패: ${file.name}`, reviewError)
             }
             
             results.push(processedData)
@@ -305,28 +291,26 @@ export default function Home() {
                 console.log(`✅ [BIZSCAN] 재시도 성공: ${file.name}`)
                 let retryProcessedData = retryResponse.data.data
                 
-                // 텍스트 검수 기능이 활성화되어 있으면 추가 검수 수행
-                if (enableTextReview) {
-                  console.log(`🔍 [BIZSCAN] 재시도 텍스트 검수 시작: ${file.name}`)
-                  try {
-                    const reviewResponse = await fetch('/api/text-review', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({ data: retryProcessedData })
-                    })
-                    
-                    if (reviewResponse.ok) {
-                      const reviewResult = await reviewResponse.json()
-                      if (reviewResult.success && reviewResult.data.needsCorrection) {
-                        console.log(`🔧 [BIZSCAN] 재시도 텍스트 수정 적용: ${file.name}`)
-                        retryProcessedData = reviewResult.data.correctedData
-                      }
+                // 텍스트 검수 기능 (항상 활성화)
+                console.log(`🔍 [BIZSCAN] 재시도 텍스트 검수 시작: ${file.name}`)
+                try {
+                  const reviewResponse = await fetch('/api/text-review', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ data: retryProcessedData })
+                  })
+                  
+                  if (reviewResponse.ok) {
+                    const reviewResult = await reviewResponse.json()
+                    if (reviewResult.success && reviewResult.data.needsCorrection) {
+                      console.log(`🔧 [BIZSCAN] 재시도 텍스트 수정 적용: ${file.name}`)
+                      retryProcessedData = reviewResult.data.correctedData
                     }
-                  } catch (reviewError) {
-                    console.log(`⚠️ [BIZSCAN] 재시도 텍스트 검수 실패: ${file.name}`, reviewError)
                   }
+                } catch (reviewError) {
+                  console.log(`⚠️ [BIZSCAN] 재시도 텍스트 검수 실패: ${file.name}`, reviewError)
                 }
                 
                 results.push(retryProcessedData)
@@ -395,10 +379,11 @@ export default function Home() {
       if (!cancelRef.current) {
         console.log(`🏁 [BIZSCAN] 모든 파일 처리 완료 - 성공: ${results.length}, 실패: ${failed.length}`)
         
-        // 무한 재시도 모드이고 실패한 파일이 있으면 자동으로 재시도
-        if (infiniteRetryMode && failed.length > 0) {
+        // 실패한 파일이 있으면 자동으로 무한 재시도 시작
+        if (failed.length > 0) {
+          setInfiniteRetryMode(true)
           setRetryCount(prev => prev + 1)
-          console.log(`🔄 [BIZSCAN] 무한 재시도 모드 - ${retryCount + 1}번째 재시도 시작 (실패 파일: ${failed.length}개)`)
+          console.log(`🔄 [BIZSCAN] 자동 무한 재시도 시작 - ${retryCount + 1}번째 재시도 (실패 파일: ${failed.length}개)`)
           
           // 실패한 파일들만 다시 처리
           const failedFileNames = new Set(failed.map(f => f.name))
@@ -481,12 +466,6 @@ export default function Home() {
     // 성공한 데이터는 유지 (초기화 안함)
     setExcelBlob(null)
     setRetryCount(0)
-  }
-
-  const handleInfiniteRetry = () => {
-    setInfiniteRetryMode(true)
-    setRetryCount(0)
-    handleRetryFailed()
   }
 
   const handleStopRetry = () => {
@@ -754,26 +733,15 @@ export default function Home() {
 
             {/* 재시도 버튼 */}
             {status === 'success' && failedFiles.length > 0 && (
-              <div className="space-y-2 mt-2">
-                <Button 
-                  onClick={handleRetryFailed}
-                  variant="outline"
-                  className="w-full h-14 text-lg"
-                  size="lg"
-                >
-                  <AlertCircle className="mr-2 h-5 w-5" />
-                  실패한 {failedFiles.length}개 재시도
-                </Button>
-                <Button 
-                  onClick={handleInfiniteRetry}
-                  variant="secondary"
-                  className="w-full h-14 text-lg bg-orange-100 hover:bg-orange-200 text-orange-800"
-                  size="lg"
-                >
-                  <RefreshCw className="mr-2 h-5 w-5" />
-                  무한 재시도 모드 (모든 파일 성공까지)
-                </Button>
-              </div>
+              <Button 
+                onClick={handleRetryFailed}
+                variant="outline"
+                className="w-full h-14 text-lg mt-2"
+                size="lg"
+              >
+                <RefreshCw className="mr-2 h-5 w-5" />
+                실패한 {failedFiles.length}개 재시도
+              </Button>
             )}
           </div>
 
@@ -851,73 +819,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* AI 모델 설정 */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700">
-                  AI 텍스트 검수 (베타)
-                </label>
-                <p className="text-xs text-gray-500 mt-1">
-                  추출된 텍스트의 오타나 오류를 AI가 검수하고 수정합니다
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={enableTextReview}
-                  onChange={(e) => setEnableTextReview(e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            {/* 모델 순위 설정 */}
-            <div className="border-t pt-4">
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
-                이미지 분석 모델 순위 설정
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500">1순위</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    value={modelPriority.first}
-                    onChange={(e) => setModelPriority({...modelPriority, first: e.target.value})}
-                  >
-                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash</option>
-                    <option value="qwen/qwen2.5-vl-72b-instruct:free">Qwen 2.5 VL</option>
-                    <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">2순위</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    value={modelPriority.second}
-                    onChange={(e) => setModelPriority({...modelPriority, second: e.target.value})}
-                  >
-                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash</option>
-                    <option value="qwen/qwen2.5-vl-72b-instruct:free">Qwen 2.5 VL</option>
-                    <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">3순위</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    value={modelPriority.third}
-                    onChange={(e) => setModelPriority({...modelPriority, third: e.target.value})}
-                  >
-                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash</option>
-                    <option value="qwen/qwen2.5-vl-72b-instruct:free">Qwen 2.5 VL</option>
-                    <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <FileDropzone 
             files={files} 
