@@ -530,22 +530,46 @@ export default function Home() {
   }
 
   const removeDuplicates = (data: ExcelRowData[]) => {
-    const seen = new Set<string>()
+    const seen = new Map<string, ExcelRowData>()
     const uniqueData: ExcelRowData[] = []
     const duplicatesRemoved: Array<{companyName: string, businessNumber: string}> = []
     
     for (const item of data) {
-      const key = item.businessRegistrationNumber || item.companyAndRepresentative
+      const businessNumber = item.businessRegistrationNumber?.trim()
       
-      if (!seen.has(key)) {
-        seen.add(key)
+      if (businessNumber && businessNumber !== '') {
+        // 사업자등록번호가 있는 경우
+        if (seen.has(businessNumber)) {
+          const existingItem = seen.get(businessNumber)!
+          // 상호명까지 비교하여 완전히 같은 경우만 중복으로 처리
+          if (existingItem.companyAndRepresentative === item.companyAndRepresentative) {
+            console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
+            duplicatesRemoved.push({
+              companyName: item.companyAndRepresentative,
+              businessNumber: item.businessRegistrationNumber
+            })
+            continue // 중복이므로 추가하지 않음
+          }
+        }
+        
+        seen.set(businessNumber, item)
         uniqueData.push(item)
       } else {
-        console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
-        duplicatesRemoved.push({
-          companyName: item.companyAndRepresentative,
-          businessNumber: item.businessRegistrationNumber
-        })
+        // 사업자등록번호가 없는 경우 상호명으로만 비교
+        const companyKey = item.companyAndRepresentative?.trim()
+        if (companyKey && !seen.has(companyKey)) {
+          seen.set(companyKey, item)
+          uniqueData.push(item)
+        } else if (companyKey && seen.has(companyKey)) {
+          console.log(`🔄 [BIZSCAN] 중복 제거 (상호명 기준): ${item.companyAndRepresentative}`)
+          duplicatesRemoved.push({
+            companyName: item.companyAndRepresentative,
+            businessNumber: item.businessRegistrationNumber || '없음'
+          })
+        } else {
+          // 사업자등록번호도 상호명도 없는 경우 그냥 추가
+          uniqueData.push(item)
+        }
       }
     }
     
