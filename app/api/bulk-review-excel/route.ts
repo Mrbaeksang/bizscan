@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🔍 [BIZSCAN] 엑셀 생성 시작 - ${rawData.length}개 데이터`)
-    console.log(`📋 [BIZSCAN] 원본 데이터 샘플:`, rawData[0])
+    console.log(`📋 [BIZSCAN] 원본 데이터 샘플:`, JSON.stringify(rawData[0], null, 2))
+    console.log(`📋 [BIZSCAN] 모든 데이터:`, JSON.stringify(rawData, null, 2))
 
     // 텍스트 검수 건너뛰고 바로 중복 제거 및 엑셀 생성
     const { uniqueData, duplicatesRemoved } = removeDuplicates(rawData)

@@ -13,6 +13,13 @@ export interface ExcelRowData {
 export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffer> {
   // 엑셀 파일 생성
   const workbook = new ExcelJS.Workbook()
+  
+  // 한글 지원을 위한 설정
+  workbook.creator = 'BizScan'
+  workbook.lastModifiedBy = 'BizScan'
+  workbook.created = new Date()
+  workbook.modified = new Date()
+  
   const worksheet = workbook.addWorksheet('사업자등록증 데이터')
 
   // 열 정의
@@ -34,9 +41,19 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     fgColor: { argb: 'FFE0E0E0' }
   }
 
-  // 데이터 추가
+  // 데이터 추가 (한글 처리)
   data.forEach(row => {
-    worksheet.addRow(row)
+    // 한글 문자열을 안전하게 처리
+    const safeRow = {
+      companyAndRepresentative: String(row.companyAndRepresentative || ''),
+      openTime: String(row.openTime || ''),
+      memo: String(row.memo || ''),
+      address: String(row.address || ''),
+      businessRegistrationNumber: String(row.businessRegistrationNumber || ''),
+      phoneNumber: String(row.phoneNumber || ''),
+      isOperational: String(row.isOperational || '')
+    }
+    worksheet.addRow(safeRow)
   })
 
   // 자동 필터 추가
