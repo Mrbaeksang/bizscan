@@ -10,7 +10,7 @@ export interface ExcelRowData {
   isOperational: string
 }
 
-export async function generateExcelFromData(data: ExcelRowData[]): Promise<ArrayBuffer> {
+export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffer> {
   // 엑셀 파일 생성
   const workbook = new ExcelJS.Workbook()
   const worksheet = workbook.addWorksheet('사업자등록증 데이터')
@@ -45,9 +45,9 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Array
     to: 'G1'
   }
 
-  // 엑셀 파일을 Buffer로 변환
+  // 엑셀 파일을 Buffer로 변환 (한글 지원)
   const buffer = await workbook.xlsx.writeBuffer()
-  return buffer
+  return Buffer.from(buffer)
 }
 
 // 부분 데이터로 Excel 생성 (진행 중 저장용)
