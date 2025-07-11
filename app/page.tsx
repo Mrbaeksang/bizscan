@@ -166,7 +166,6 @@ export default function Home() {
       setSuccessCount(0)
       setProcessedData([])
       setRawProcessedData([])
-      setReviewedData([])
       setBulkReviewResults({
         originalCount: 0,
         afterDeduplication: 0,
