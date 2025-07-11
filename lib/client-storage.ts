@@ -37,7 +37,7 @@ class ClientStorage {
   async clearAll(): Promise<void> {
     this.results = [];
     localStorage.removeItem('bizscan_backup');
-    console.log(`🗑️ [CLIENT] 모든 결과 삭제`);
+    console.log(`🗑️ [CLIENT] 모든 결과 및 백업 삭제`);
   }
 
   // localStorage에 백업 (새로고침 대비)

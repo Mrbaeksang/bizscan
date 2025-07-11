@@ -8,7 +8,7 @@ import { LivePreviewModal } from '@/components/live-preview-modal'
 import { ReviewResultsModal } from '@/components/review-results-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Table, Mail, RefreshCw, X } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Table, Mail, RefreshCw, X, Trash2 } from 'lucide-react'
 import { compressImage } from '@/lib/image-utils'
 import { clientStorage } from '@/lib/client-storage'
 import { generateExcelFromData, generatePartialExcel } from '@/lib/excel-generator'
@@ -172,6 +172,7 @@ export default function Home() {
         totalDuplicates: 0,
         totalCorrections: 0
       })
+      console.log('🔄 [BIZSCAN] 새로운 처리 시작 - 모든 상태 초기화')
     } else {
       console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 유지')
     }
@@ -892,6 +893,42 @@ export default function Home() {
     }
   }
 
+  const handleReset = async () => {
+    if (confirm('모든 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+      console.log('🔄 [BIZSCAN] 완전 초기화 시작')
+      
+      // 모든 상태 초기화
+      setFiles([])
+      setProcessedData([])
+      setFailedFiles([])
+      setSuccessCount(0)
+      setProgress(0)
+      setCurrentFile(0)
+      setExcelBlob(null)
+      setErrorMessage('')
+      setStatus('idle')
+      setInfiniteRetryMode(false)
+      setRetryCount(0)
+      setPausedState(null)
+      setIsResuming(false)
+      setReviewResults({
+        duplicatesRemoved: [],
+        textCorrections: [],
+        totalProcessed: 0,
+        totalDuplicates: 0,
+        totalCorrections: 0
+      })
+      
+      // 클라이언트 저장소 완전 초기화
+      await clientStorage.clearAll()
+      
+      // 취소 상태 초기화
+      cancelRef.current = false
+      
+      console.log('✅ [BIZSCAN] 완전 초기화 완료')
+    }
+  }
+
   const handlePartialDownload = async () => {
     if (processedData.length > 0) {
       console.log(`📥 [BIZSCAN] 부분 Excel 다운로드 시작 (${processedData.length}개 데이터)`)
@@ -1053,6 +1090,19 @@ export default function Home() {
                 {files.length}개 파일로 엑셀 생성
               </Button>
             )}
+            
+            {/* 초기화 버튼 */}
+            {(status === 'idle' || status === 'error' || status === 'success') && (
+              <Button 
+                onClick={handleReset}
+                variant="outline"
+                className="h-14 text-lg px-6 border-red-200 text-red-600 hover:bg-red-50"
+                size="lg"
+              >
+                <Trash2 className="mr-2 h-5 w-5" />
+                초기화
+              </Button>
+            )}
 
             {/* 엑셀 다운로드 버튼 */}
             {status === 'success' && excelBlob && (
@@ -1119,6 +1169,11 @@ export default function Home() {
                   <p className="text-sm font-medium text-blue-900">
                     처리 중: {currentFile} / {files.length} ({successCount} 성공, {failedFiles.length} 실패)
                   </p>
+                  {currentFile > 0 && currentFile <= files.length && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      📄 현재: {files[currentFile - 1]?.name || ''}
+                    </p>
+                  )}
                   {infiniteRetryMode && (
                     <p className="text-xs text-orange-600 mt-1">
                       🔄 무한 재시도 모드 (재시도 횟수: {retryCount})
@@ -1164,9 +1219,12 @@ export default function Home() {
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <div className="text-center">
-                <span className="text-2xl font-bold text-blue-900">{progress}%</span>
-                <span className="text-sm text-blue-700 ml-2">완료</span>
+              <div className="text-center flex items-center justify-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div>
+                  <span className="text-2xl font-bold text-blue-900">{progress}%</span>
+                  <span className="text-sm text-blue-700 ml-2">완료</span>
+                </div>
               </div>
               <div className="flex gap-2">
                 {processedData.length > 0 && (
