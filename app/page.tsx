@@ -7,7 +7,7 @@ import { FailedFilesModal } from '@/components/failed-files-modal'
 import { ReviewResultsModal } from '@/components/review-results-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Table, Mail, RefreshCw, X, Trash2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, Mail, RefreshCw, X, Trash2 } from 'lucide-react'
 import { compressImage } from '@/lib/image-utils'
 import { clientStorage } from '@/lib/client-storage'
 import { generateExcelFromData, generatePartialExcel } from '@/lib/excel-generator'
@@ -57,7 +57,6 @@ export default function Home() {
     totalCorrections: 0
   })
   const [isBulkReviewing, setIsBulkReviewing] = useState(false)
-  const [reviewedData, setReviewedData] = useState<ExcelRowData[]>([])
   const [rawProcessedData, setRawProcessedData] = useState<ExcelRowData[]>([])
   const [showReviewResults, setShowReviewResults] = useState(false)
 
@@ -274,7 +273,7 @@ export default function Home() {
           if (response.data.success) {
             console.log(`✅ [BIZSCAN] 데이터 추출 성공: ${file.name}`)
             console.log(`📊 [BIZSCAN] 추출된 데이터:`, response.data.data)
-            let processedData = response.data.data
+            const processedData = response.data.data
             
             // 개별 텍스트 검수 제거 - 일괄 검수로 대체
             
@@ -321,7 +320,7 @@ export default function Home() {
               
               if (retryResponse.data.success) {
                 console.log(`✅ [BIZSCAN] 재시도 성공: ${file.name}`)
-                let retryProcessedData = retryResponse.data.data
+                const retryProcessedData = retryResponse.data.data
                 
                 // 재시도 시에도 개별 텍스트 검수 제거
                 
@@ -871,7 +870,6 @@ export default function Home() {
         totalCorrections: 0
       })
       setIsBulkReviewing(false)
-      setReviewedData([])
       setRawProcessedData([])
       
       // 클라이언트 저장소 완전 초기화
@@ -884,30 +882,6 @@ export default function Home() {
     }
   }
 
-  const handlePartialDownload = async () => {
-    if (processedData.length > 0) {
-      console.log(`📥 [BIZSCAN] 부분 Excel 다운로드 시작 (${processedData.length}개 데이터)`)
-      const partialBlob = await generatePartialExcel(
-        processedData,
-        files.length,
-        successCount,
-        failedFiles.length
-      )
-      
-      const filename = `bizscan_partial_${successCount}_of_${files.length}.xlsx`
-      const url = window.URL.createObjectURL(partialBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      window.URL.revokeObjectURL(url)
-      console.log(`✅ [BIZSCAN] 부분 Excel 다운로드 완료: ${filename} (크기: ${partialBlob.size}bytes)`)
-    } else {
-      console.error(`❌ [BIZSCAN] 처리된 데이터가 없어서 부분 다운로드 불가`)
-    }
-  }
 
   return (
     <main className="min-h-screen bg-slate-50">

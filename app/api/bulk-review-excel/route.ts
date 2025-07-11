@@ -100,8 +100,6 @@ ${index + 1}. 상호명: ${data.companyAndRepresentative}
     'deepseek/deepseek-r1:free'             // 3순위
   ]
 
-  let lastError: Error | null = null
-  
   for (const model of textModels) {
     try {
       console.log(`🔍 [BIZSCAN] 일괄 텍스트 검수 시도 중: ${model}`)
@@ -162,7 +160,6 @@ ${index + 1}. 상호명: ${data.companyAndRepresentative}
         }
       }
     } catch (error) {
-      lastError = error as Error
       console.error(`❌ [BIZSCAN] 일괄 텍스트 검수 실패: ${model}`, error)
       continue
     }
