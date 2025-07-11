@@ -44,7 +44,7 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
   const base64Image = imageBuffer.toString('base64')
 
   // 단일 모델 사용
-  const models = ['google/gemini-flash-1.5-8b']
+  const models = ['google/gemini-2.0-flash-lite-001']
   
   console.log(`🎯 [BIZSCAN] 사용할 모델 순위: ${models.join(' → ')}`)
 
