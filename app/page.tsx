@@ -129,23 +129,52 @@ export default function Home() {
     console.log('🚀 [BIZSCAN] 처리 시작 - 총 파일 수:', files.length)
     console.log('🚀 [BIZSCAN] 파일 목록:', files.map(f => `${f.name} (${f.size}bytes)`))
 
-    // 초기화
+    // 초기화 (재시도가 아닌 경우만 완전 초기화)
     setStatus('analyzing')
     setProgress(0)
     setCurrentFile(0)
     setErrorMessage('')
     setFailedFiles([])
-    setSuccessCount(0)
-    setProcessedData([])
+    
+    // 재시도인지 확인 (기존 데이터 있으면 재시도)
+    const isRetry = processedData.length > 0
+    
+    if (!isRetry) {
+      setSuccessCount(0)
+      setProcessedData([])
+    } else {
+      console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 유지')
+    }
+    
     cancelRef.current = false
 
     // 클라이언트 저장소 초기화 (재시도가 아닌 경우만)
-    if (processedData.length === 0) {
+    let existingResults: ExcelRowData[] = []
+    
+    if (!isRetry) {
       console.log('🔄 [BIZSCAN] 클라이언트 저장소 초기화 중...')
       await clientStorage.clearAll()
       console.log('✅ [BIZSCAN] 클라이언트 저장소 초기화 완료')
     } else {
-      console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 유지')
+      console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 로드 중...')
+      const storedResults = await clientStorage.getResults()
+      const successResults = storedResults.filter(r => r.status === 'success')
+      
+      existingResults = successResults.map(r => ({
+        companyAndRepresentative: `${r.data.상호명 || ''}(${r.data.대표자명 || ''})`,
+        openTime: '',
+        memo: '',
+        address: r.data.사업자주소 || '',
+        businessRegistrationNumber: r.data.사업자등록번호 || '',
+        phoneNumber: '',
+        isOperational: '',
+        대표자명: r.data.대표자명,
+        상호명: r.data.상호명,
+        사업자주소: r.data.사업자주소,
+        사업자등록번호: r.data.사업자등록번호
+      }))
+      
+      console.log(`✅ [BIZSCAN] 기존 성공 데이터 ${existingResults.length}개 로드됨`)
     }
 
     const totalFiles = files.length
@@ -285,7 +314,10 @@ export default function Home() {
         const currentProgress = Math.round(((i + 1) / totalFiles) * 100)
         console.log(`📊 [BIZSCAN] 진행률 업데이트: ${currentProgress}% (${i + 1}/${totalFiles})`)
         setProgress(currentProgress)
-        setProcessedData([...results])
+        
+        // 기존 데이터와 새 데이터 병합
+        const mergedData = [...existingResults, ...results]
+        setProcessedData(mergedData)
         setFailedFiles([...failed])
 
         // 2초 대기 (무료 API Rate Limit 방지 - 최적화)
@@ -300,11 +332,12 @@ export default function Home() {
         console.log(`🏁 [BIZSCAN] 모든 파일 처리 완료 - 성공: ${results.length}, 실패: ${failed.length}`)
         setStatus('generating')
         
-        // 클라이언트에서 Excel 생성
-        if (results.length > 0) {
-          console.log(`📊 [BIZSCAN] Excel 생성 시작... (${results.length}개 데이터)`)
+        // 클라이언트에서 Excel 생성 (기존 데이터 + 새 데이터)
+        const finalResults = [...existingResults, ...results]
+        if (finalResults.length > 0) {
+          console.log(`📊 [BIZSCAN] Excel 생성 시작... (기존 ${existingResults.length}개 + 새로운 ${results.length}개 = 총 ${finalResults.length}개 데이터)`)
           const excelStartTime = Date.now()
-          const excelBlob = await generateExcelFromData(results)
+          const excelBlob = await generateExcelFromData(finalResults)
           const excelDuration = Date.now() - excelStartTime
           console.log(`✅ [BIZSCAN] Excel 생성 완료 (소요시간: ${excelDuration}ms, 크기: ${excelBlob.size}bytes)`)
           setExcelBlob(excelBlob)
