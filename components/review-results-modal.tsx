@@ -15,15 +15,17 @@ interface ReviewResultsModalProps {
   open: boolean
   onClose: () => void
   reviewResults: {
+    originalCount: number
+    afterDeduplication: number
     duplicatesRemoved: Array<{companyName: string, businessNumber: string}>
     textCorrections: Array<{fileName: string, field: string, original: string, corrected: string, reason: string}>
-    totalProcessed: number
-    totalDuplicates: number
     totalCorrections: number
-  }
+  } | null
 }
 
 export function ReviewResultsModal({ open, onClose, reviewResults }: ReviewResultsModalProps) {
+  if (!reviewResults) return null
+  
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -43,16 +45,16 @@ export function ReviewResultsModal({ open, onClose, reviewResults }: ReviewResul
             <h3 className="font-semibold text-blue-900 mb-2">📊 검수 요약</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-blue-700">처리된 파일:</span>
-                <span className="font-medium ml-2">{reviewResults.totalProcessed}개</span>
+                <span className="text-blue-700">원본 데이터:</span>
+                <span className="font-medium ml-2">{reviewResults.originalCount}개</span>
               </div>
               <div>
                 <span className="text-blue-700">중복 제거:</span>
-                <span className="font-medium ml-2">{reviewResults.totalDuplicates}개</span>
+                <span className="font-medium ml-2">{reviewResults.duplicatesRemoved.length}개</span>
               </div>
               <div>
-                <span className="text-blue-700">텍스트 수정:</span>
-                <span className="font-medium ml-2">{reviewResults.totalCorrections}개</span>
+                <span className="text-blue-700">최종 데이터:</span>
+                <span className="font-medium ml-2">{reviewResults.afterDeduplication}개</span>
               </div>
             </div>
           </div>
@@ -102,7 +104,7 @@ export function ReviewResultsModal({ open, onClose, reviewResults }: ReviewResul
           )}
 
           {/* 검수 결과가 없는 경우 */}
-          {reviewResults.totalDuplicates === 0 && reviewResults.totalCorrections === 0 && (
+          {reviewResults.duplicatesRemoved.length === 0 && reviewResults.totalCorrections === 0 && (
             <div className="bg-gray-50 p-8 rounded-lg border border-gray-200 text-center">
               <CheckCircle2 className="h-12 w-12 mx-auto text-green-600 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">완벽한 데이터!</h3>

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -14,23 +14,11 @@ import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 interface FailedFilesModalProps {
   open: boolean
   onClose: () => void
-  failedFiles: File[]
+  failedFiles: {name: string, error: string}[]
 }
 
 export function FailedFilesModal({ open, onClose, failedFiles }: FailedFilesModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [imageUrls, setImageUrls] = useState<string[]>([])
-
-  useEffect(() => {
-    // 파일들을 URL로 변환
-    const urls = failedFiles.map(file => URL.createObjectURL(file))
-    setImageUrls(urls)
-
-    // 클린업 함수
-    return () => {
-      urls.forEach(url => URL.revokeObjectURL(url))
-    }
-  }, [failedFiles])
 
   const handlePrevious = () => {
     setCurrentIndex((prev) => (prev === 0 ? failedFiles.length - 1 : prev - 1))
@@ -43,57 +31,57 @@ export function FailedFilesModal({ open, onClose, failedFiles }: FailedFilesModa
   if (failedFiles.length === 0) return null
 
   const currentFile = failedFiles[currentIndex]
-  const currentImageUrl = imageUrls[currentIndex]
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-full max-h-[90vh] p-0">
+      <DialogContent className="max-w-2xl w-full max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-orange-600" />
-            처리 실패한 이미지 확인
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            처리 실패한 파일 목록
           </DialogTitle>
           <DialogDescription>
             {currentIndex + 1} / {failedFiles.length} - {currentFile?.name}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="relative bg-slate-100 flex items-center justify-center min-h-[400px]">
-          {/* 이미지 표시 */}
-          {currentImageUrl && (
-            <img
-              src={currentImageUrl}
-              alt={currentFile?.name}
-              className="max-w-full max-h-[60vh] object-contain"
-            />
-          )}
+        <div className="p-6 space-y-4">
+          <div className="bg-red-50 p-4 rounded-lg">
+            <h3 className="font-medium text-red-800 mb-2">파일명:</h3>
+            <p className="text-red-700">{currentFile?.name}</p>
+          </div>
+          
+          <div className="bg-red-50 p-4 rounded-lg">
+            <h3 className="font-medium text-red-800 mb-2">에러 메시지:</h3>
+            <p className="text-red-700">{currentFile?.error}</p>
+          </div>
 
           {/* 이전/다음 버튼 */}
           {failedFiles.length > 1 && (
-            <>
+            <div className="flex justify-between">
               <Button
                 onClick={handlePrevious}
                 variant="outline"
-                size="icon"
-                className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/80 hover:bg-white"
+                size="sm"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                이전
               </Button>
               <Button
                 onClick={handleNext}
                 variant="outline"
-                size="icon"
-                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/80 hover:bg-white"
+                size="sm"
               >
-                <ChevronRight className="h-4 w-4" />
+                다음
+                <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
-            </>
+            </div>
           )}
         </div>
 
-        <div className="p-6 pt-4 bg-orange-50 border-t">
-          <p className="text-sm text-orange-800">
-            이 이미지들은 AI가 인식하지 못했습니다. 
+        <div className="p-6 pt-4 bg-red-50 border-t">
+          <p className="text-sm text-red-800">
+            이 파일들은 AI가 인식하지 못했습니다. 
             이미지 품질을 확인하고 다시 시도해주세요.
           </p>
           <div className="flex justify-between items-center mt-4">
