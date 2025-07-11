@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// 6자리 숫자 코드 생성 (일단 고정)
+// 6자리 숫자 코드 생성 (무작위)
 function generateCode(): string {
-  return "123456" // 테스트용 고정 코드
+  return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
 // 카카오톡 나에게 보내기
