@@ -22,15 +22,12 @@ export async function POST(request: NextRequest) {
     console.log(`🔄 [BIZSCAN] 중복 제거 완료 - ${uniqueData.length}개 남음`)
     
     console.log(`📊 [BIZSCAN] 엑셀 생성 함수 호출 중...`)
-    const excelBlob = await generateExcelFromData(uniqueData)
-    console.log(`✅ [BIZSCAN] 엑셀 블롭 생성 완료 - 크기: ${excelBlob.size}bytes`)
-    
-    const buffer = await excelBlob.arrayBuffer()
-    console.log(`📦 [BIZSCAN] 버퍼 변환 완료 - 크기: ${buffer.byteLength}bytes`)
+    const arrayBuffer = await generateExcelFromData(uniqueData)
+    console.log(`✅ [BIZSCAN] 엑셀 버퍼 생성 완료 - 크기: ${arrayBuffer.byteLength}bytes`)
     
     console.log(`✅ [BIZSCAN] 엑셀 생성 완료 - 원본 ${rawData.length}개 → 최종 ${uniqueData.length}개`)
     
-    return new NextResponse(buffer, {
+    return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
