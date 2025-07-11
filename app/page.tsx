@@ -231,14 +231,28 @@ export default function Home() {
     setIsGenerating(true)
     
     try {
+      console.log(`🔍 [BIZSCAN] 엑셀 생성 API 호출 시작 - ${data.length}개 데이터`)
+      
       const response = await fetch('/api/bulk-review-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rawData: data })
       })
       
+      console.log(`📋 [BIZSCAN] API 응답 상태: ${response.status}`)
+      console.log(`📋 [BIZSCAN] 응답 헤더:`, response.headers)
+      
       if (response.ok) {
         const blob = await response.blob()
+        console.log(`📊 [BIZSCAN] 블롭 크기: ${blob.size}bytes, 타입: ${blob.type}`)
+        
+        // 블롭 내용이 JSON 에러인지 확인
+        if (blob.size < 1000 && blob.type === 'application/json') {
+          const text = await blob.text()
+          console.error(`❌ [BIZSCAN] JSON 에러 응답:`, text)
+          return
+        }
+        
         setExcelBlob(blob)
         
         // 리뷰 결과 저장
@@ -248,6 +262,9 @@ export default function Home() {
         }
         
         console.log(`📊 [BIZSCAN] 엑셀 생성 완료`)
+      } else {
+        const errorText = await response.text()
+        console.error(`❌ [BIZSCAN] API 에러 응답:`, errorText)
       }
     } catch (error) {
       console.error('엑셀 생성 실패:', error)
@@ -271,7 +288,7 @@ export default function Home() {
   // 완료 음성
   const playCompletionSound = () => {
     try {
-      const audio = new Audio('/complete.mp3')
+      const audio = new Audio('/notification.mp3')
       audio.play().catch(() => console.log('음성 재생 실패'))
     } catch {
       console.log('음성 파일 없음')
