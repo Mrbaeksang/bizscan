@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
-import { useRouter } from 'next/navigation'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
 import { LivePreviewModal } from '@/components/live-preview-modal'
@@ -18,7 +17,6 @@ type Status = 'idle' | 'uploading' | 'analyzing' | 'generating' | 'success' | 'e
 type AuthStep = 'request' | 'verify' | 'authenticated'
 
 export default function Home() {
-  const router = useRouter()
   const [authStep, setAuthStep] = useState<AuthStep>('request')
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'error'>('idle')

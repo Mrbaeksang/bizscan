@@ -7,8 +7,7 @@ import { FileSpreadsheet, Mail, CheckCircle2, AlertCircle } from 'lucide-react'
 import { clientStorage } from '@/lib/client-storage'
 
 export default function SimpleAuthPage() {
-  const [step, setStep] = useState<'input' | 'verify'>('input')
-  const [userId, setUserId] = useState('')
+  const [step, setStep] = useState<'request' | 'verify'>('request')
   const [code, setCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [message, setMessage] = useState('')
@@ -22,12 +21,6 @@ export default function SimpleAuthPage() {
   }, [])
 
   const handleRequestCode = async () => {
-    if (!userId.trim()) {
-      setMessage('아이디를 입력해주세요.')
-      setStatus('error')
-      return
-    }
-
     setStatus('loading')
     
     try {
@@ -37,7 +30,7 @@ export default function SimpleAuthPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: userId.trim()
+          userId: 'admin' // 고정값
         })
       })
       
@@ -66,7 +59,7 @@ export default function SimpleAuthPage() {
 
     // 클라이언트에서 간단한 토큰 생성 (서버 검증 없음)
     const token = btoa(JSON.stringify({
-      userId: userId.trim(),
+      userId: 'admin',
       code: code.trim(),
       loginTime: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
@@ -109,24 +102,8 @@ export default function SimpleAuthPage() {
             </Alert>
           )}
 
-          {step === 'input' && (
+          {step === 'request' && (
             <div className="space-y-4">
-              <div>
-                <label htmlFor="userId" className="block text-sm font-medium mb-2">
-                  아이디
-                </label>
-                <input
-                  id="userId"
-                  type="text"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="아이디를 입력하세요"
-                  disabled={status === 'loading'}
-                  onKeyPress={(e) => e.key === 'Enter' && handleRequestCode()}
-                />
-              </div>
-              
               <Button 
                 onClick={handleRequestCode}
                 disabled={status === 'loading'}
@@ -187,7 +164,7 @@ export default function SimpleAuthPage() {
               
               <Button 
                 onClick={() => {
-                  setStep('input')
+                  setStep('request')
                   setCode('')
                   setMessage('')
                   setStatus('idle')
