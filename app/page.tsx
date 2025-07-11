@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
-import { LivePreviewModal } from '@/components/live-preview-modal'
 import { ReviewResultsModal } from '@/components/review-results-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -33,7 +32,6 @@ export default function Home() {
   const [successCount, setSuccessCount] = useState(0)
   const [processedData, setProcessedData] = useState<ExcelRowData[]>([])
   const [showFailedFilesModal, setShowFailedFilesModal] = useState(false)
-  const [showLivePreview, setShowLivePreview] = useState(false)
   const cancelRef = useRef(false)
   const [infiniteRetryMode, setInfiniteRetryMode] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
@@ -45,19 +43,22 @@ export default function Home() {
     currentIndex: number
     totalFiles: number
   } | null>(null)
-  const [reviewResults, setReviewResults] = useState<{
+  const [bulkReviewResults, setBulkReviewResults] = useState<{
+    originalCount: number,
+    afterDeduplication: number,
     duplicatesRemoved: Array<{companyName: string, businessNumber: string}>,
     textCorrections: Array<{fileName: string, field: string, original: string, corrected: string, reason: string}>,
-    totalProcessed: number,
-    totalDuplicates: number,
     totalCorrections: number
   }>({
+    originalCount: 0,
+    afterDeduplication: 0,
     duplicatesRemoved: [],
     textCorrections: [],
-    totalProcessed: 0,
-    totalDuplicates: 0,
     totalCorrections: 0
   })
+  const [isBulkReviewing, setIsBulkReviewing] = useState(false)
+  const [reviewedData, setReviewedData] = useState<ExcelRowData[]>([])
+  const [rawProcessedData, setRawProcessedData] = useState<ExcelRowData[]>([])
   const [showReviewResults, setShowReviewResults] = useState(false)
 
   // 인증 상태 확인
@@ -165,13 +166,16 @@ export default function Home() {
     if (!isRetry) {
       setSuccessCount(0)
       setProcessedData([])
-      setReviewResults({
+      setRawProcessedData([])
+      setReviewedData([])
+      setBulkReviewResults({
+        originalCount: 0,
+        afterDeduplication: 0,
         duplicatesRemoved: [],
         textCorrections: [],
-        totalProcessed: 0,
-        totalDuplicates: 0,
         totalCorrections: 0
       })
+      setIsBulkReviewing(false)
       console.log('🔄 [BIZSCAN] 새로운 처리 시작 - 모든 상태 초기화')
     } else {
       console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 유지')
@@ -272,47 +276,13 @@ export default function Home() {
             console.log(`📊 [BIZSCAN] 추출된 데이터:`, response.data.data)
             let processedData = response.data.data
             
-            // 텍스트 검수 기능 (항상 활성화)
-            console.log(`🔍 [BIZSCAN] 텍스트 검수 시작: ${file.name}`)
-            try {
-              const reviewResponse = await fetch('/api/text-review', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ data: processedData })
-              })
-              
-              if (reviewResponse.ok) {
-                const reviewResult = await reviewResponse.json()
-                if (reviewResult.success && reviewResult.data.needsCorrection) {
-                  console.log(`🔧 [BIZSCAN] 텍스트 수정 적용: ${file.name}`)
-                  processedData = reviewResult.data.correctedData
-                  
-                  // 검수 결과 저장
-                  if (reviewResult.data.corrections && reviewResult.data.corrections.length > 0) {
-                    const corrections = reviewResult.data.corrections.map((correction: {field: string, original: string, corrected: string, reason: string}) => ({
-                      fileName: file.name,
-                      field: correction.field,
-                      original: correction.original,
-                      corrected: correction.corrected,
-                      reason: correction.reason
-                    }))
-                    
-                    setReviewResults(prev => ({
-                      ...prev,
-                      textCorrections: [...prev.textCorrections, ...corrections],
-                      totalCorrections: prev.totalCorrections + corrections.length
-                    }))
-                  }
-                }
-              }
-            } catch (reviewError) {
-              console.log(`⚠️ [BIZSCAN] 텍스트 검수 실패: ${file.name}`, reviewError)
-            }
+            // 개별 텍스트 검수 제거 - 일괄 검수로 대체
             
             results.push(processedData)
             setSuccessCount(prev => prev + 1)
+            
+            // 원본 데이터 저장 (딥시크 검수 전)
+            setRawProcessedData(prev => [...prev, processedData])
             
             // 처리된 파일명을 추적 목록에 추가
             processedFileNames.add(file.name)
@@ -353,47 +323,13 @@ export default function Home() {
                 console.log(`✅ [BIZSCAN] 재시도 성공: ${file.name}`)
                 let retryProcessedData = retryResponse.data.data
                 
-                // 텍스트 검수 기능 (항상 활성화)
-                console.log(`🔍 [BIZSCAN] 재시도 텍스트 검수 시작: ${file.name}`)
-                try {
-                  const reviewResponse = await fetch('/api/text-review', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ data: retryProcessedData })
-                  })
-                  
-                  if (reviewResponse.ok) {
-                    const reviewResult = await reviewResponse.json()
-                    if (reviewResult.success && reviewResult.data.needsCorrection) {
-                      console.log(`🔧 [BIZSCAN] 재시도 텍스트 수정 적용: ${file.name}`)
-                      retryProcessedData = reviewResult.data.correctedData
-                      
-                      // 검수 결과 저장
-                      if (reviewResult.data.corrections && reviewResult.data.corrections.length > 0) {
-                        const corrections = reviewResult.data.corrections.map((correction: {field: string, original: string, corrected: string, reason: string}) => ({
-                          fileName: file.name,
-                          field: correction.field,
-                          original: correction.original,
-                          corrected: correction.corrected,
-                          reason: correction.reason
-                        }))
-                        
-                        setReviewResults(prev => ({
-                          ...prev,
-                          textCorrections: [...prev.textCorrections, ...corrections],
-                          totalCorrections: prev.totalCorrections + corrections.length
-                        }))
-                      }
-                    }
-                  }
-                } catch (reviewError) {
-                  console.log(`⚠️ [BIZSCAN] 재시도 텍스트 검수 실패: ${file.name}`, reviewError)
-                }
+                // 재시도 시에도 개별 텍스트 검수 제거
                 
                 results.push(retryProcessedData)
                 setSuccessCount(prev => prev + 1)
+                
+                // 원본 데이터 저장 (딥시크 검수 전)
+                setRawProcessedData(prev => [...prev, retryProcessedData])
                 
                 // 처리된 파일명을 추적 목록에 추가
                 processedFileNames.add(file.name)
@@ -482,43 +418,11 @@ export default function Home() {
           return
         }
         
-        // 모든 파일 처리 완료 (성공 또는 재시도 중단)
-        setStatus('generating')
-        
-        // 클라이언트에서 Excel 생성 (기존 데이터 + 새 데이터)
-        const combinedResults = [...existingResults, ...results]
-        
-        // 중복 제거 (사업자등록번호 기준)
-        const uniqueResults = removeDuplicates(combinedResults)
-        const duplicateCount = combinedResults.length - uniqueResults.length
-        
-        if (duplicateCount > 0) {
-          console.log(`🔄 [BIZSCAN] 중복 데이터 ${duplicateCount}개 제거됨`)
-        }
-
-        // 처리된 파일 수 업데이트
-        setReviewResults(prev => ({
-          ...prev,
-          totalProcessed: prev.totalProcessed + files.length
-        }))
-        
-        if (uniqueResults.length > 0) {
-          console.log(`📊 [BIZSCAN] Excel 생성 시작... (기존 ${existingResults.length}개 + 새로운 ${results.length}개 → 중복제거 후 ${uniqueResults.length}개 데이터)`)
-          const excelStartTime = Date.now()
-          const excelBlob = await generateExcelFromData(uniqueResults)
-          const excelDuration = Date.now() - excelStartTime
-          console.log(`✅ [BIZSCAN] Excel 생성 완료 (소요시간: ${excelDuration}ms, 크기: ${excelBlob.size}bytes)`)
-          setExcelBlob(excelBlob)
+        // 모든 파일 처리 완료 시 자동 일괄 검수
+        if (rawProcessedData.length > 0) {
+          await performBulkReview()
         } else {
-          console.log(`⚠️ [BIZSCAN] 성공한 데이터가 없어 Excel 생성 안함`)
-        }
-        
-        setStatus('success')
-        
-        // 모든 처리가 완료되면 알림음 재생
-        if (failed.length === 0) {
-          console.log(`🎉 [BIZSCAN] 모든 파일 처리 완료! 알림음 재생`)
-          playNotificationSound()
+          setStatus('success')
         }
         
         console.log(`🎉 [BIZSCAN] 전체 처리 완료!`)
@@ -532,9 +436,9 @@ export default function Home() {
     }
   }
 
-  const handlePauseResume = () => {
+  const handlePauseResume = async () => {
     if (status === 'analyzing') {
-      // 일시정지: 현재 상태 저장
+      // 일시정지: 현재 상태 저장 및 일괄 검수 시작
       const currentResults = processedData
       const currentFailed = failedFiles
       const currentProcessed = files.filter((_, index) => index < currentFile).map(f => f.name)
@@ -550,6 +454,11 @@ export default function Home() {
       cancelRef.current = true
       setStatus('paused')
       console.log(`⏸️ [BIZSCAN] 일시정지 - 진행: ${currentFile}/${files.length} (성공: ${currentResults.length}, 실패: ${currentFailed.length})`)
+      
+      // 일괄 검수 시작
+      if (rawProcessedData.length > 0) {
+        await performBulkReview()
+      }
     } else if (status === 'paused') {
       // 재개: 저장된 상태에서 계속
       setIsResuming(true)
@@ -567,6 +476,49 @@ export default function Home() {
       
       // 재개 상태 초기화
       setTimeout(() => setIsResuming(false), 1000)
+    }
+  }
+
+  const performBulkReview = async () => {
+    setIsBulkReviewing(true)
+    console.log(`🔍 [BIZSCAN] AI 검수 시작 - ${rawProcessedData.length}개 데이터`)
+    
+    try {
+      const response = await fetch('/api/bulk-review-excel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rawData: rawProcessedData })
+      })
+      
+      if (response.ok) {
+        // 검수 결과 헤더에서 추출
+        const reviewResultsHeader = response.headers.get('X-Review-Results')
+        if (reviewResultsHeader) {
+          const reviewResults = JSON.parse(reviewResultsHeader)
+          setBulkReviewResults(reviewResults)
+          console.log(`✅ [BIZSCAN] AI 검수 완료 - 원본 ${reviewResults.originalCount}개 → 최종 ${reviewResults.afterDeduplication}개`)
+        }
+        
+        // 엑셀 블롭 저장
+        const blob = await response.blob()
+        setExcelBlob(blob)
+        setStatus('success')
+        
+        // 알림음 재생
+        playNotificationSound()
+      } else {
+        console.error('일괄 검수 실패')
+        setStatus('error')
+        setErrorMessage('AI 검수 중 오류가 발생했습니다.')
+      }
+    } catch (error) {
+      console.error('일괄 검수 중 오류:', error)
+      setStatus('error')
+      setErrorMessage('AI 검수 중 오류가 발생했습니다.')
+    } finally {
+      setIsBulkReviewing(false)
     }
   }
 
@@ -911,13 +863,16 @@ export default function Home() {
       setRetryCount(0)
       setPausedState(null)
       setIsResuming(false)
-      setReviewResults({
+      setBulkReviewResults({
+        originalCount: 0,
+        afterDeduplication: 0,
         duplicatesRemoved: [],
         textCorrections: [],
-        totalProcessed: 0,
-        totalDuplicates: 0,
         totalCorrections: 0
       })
+      setIsBulkReviewing(false)
+      setReviewedData([])
+      setRawProcessedData([])
       
       // 클라이언트 저장소 완전 초기화
       await clientStorage.clearAll()
@@ -1105,7 +1060,7 @@ export default function Home() {
             )}
 
             {/* 엑셀 다운로드 버튼 */}
-            {status === 'success' && excelBlob && (
+            {(status === 'success' || (status === 'paused' && !isBulkReviewing)) && excelBlob && (
               <>
                 <Button 
                   onClick={handleDownload}
@@ -1113,16 +1068,7 @@ export default function Home() {
                   size="lg"
                 >
                   <Download className="mr-2 h-5 w-5" />
-                  엑셀 다운로드
-                </Button>
-                <Button 
-                  onClick={() => setShowLivePreview(true)}
-                  variant="outline"
-                  className="h-14 text-lg px-6"
-                  size="lg"
-                >
-                  <Table className="mr-2 h-5 w-5" />
-                  데이터 미리보기
+                  엑셀 다운로드 ({bulkReviewResults.afterDeduplication}개)
                 </Button>
                 <Button 
                   onClick={() => setShowReviewResults(true)}
@@ -1146,6 +1092,29 @@ export default function Home() {
                 )}
               </>
             )}
+            
+            {/* 재개 버튼 */}
+            {status === 'paused' && !isBulkReviewing && (
+              <Button 
+                onClick={handlePauseResume}
+                variant="outline"
+                className="h-14 text-lg px-6"
+                size="lg"
+                disabled={isResuming}
+              >
+                {isResuming ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current mr-2" />
+                    재개 중...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-5 w-5" />
+                    재개 ({files.length - currentFile + failedFiles.length}개 남음)
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* 재시도 버튼 */}
             {status === 'success' && failedFiles.length > 0 && (
@@ -1161,8 +1130,23 @@ export default function Home() {
             )}
           </div>
 
+          {/* AI 검수 중 상태 표시 */}
+          {isBulkReviewing && (
+            <div className="space-y-4 bg-green-50 p-6 rounded-lg border border-green-200">
+              <div className="flex items-center justify-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                <div className="text-center">
+                  <span className="text-xl font-bold text-green-900">AI가 검수 중입니다...</span>
+                  <p className="text-sm text-green-700 mt-1">
+                    {rawProcessedData.length}개 데이터를 딥시크가 검토하고 있습니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 진행 상황 표시 - 상단으로 이동 */}
-          {(status === 'analyzing' || status === 'paused') && (
+          {(status === 'analyzing' || status === 'paused') && !isBulkReviewing && (
             <div className="space-y-4 bg-blue-50 p-6 rounded-lg border border-blue-200">
               <div className="flex justify-between items-center">
                 <div className="flex flex-col">
@@ -1220,33 +1204,19 @@ export default function Home() {
                 />
               </div>
               <div className="text-center flex items-center justify-center gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                {status === 'analyzing' ? (
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                ) : (
+                  <div className="rounded-full h-8 w-8 border-2 border-orange-400 bg-orange-100 flex items-center justify-center">
+                    <Pause className="h-4 w-4 text-orange-600" />
+                  </div>
+                )}
                 <div>
                   <span className="text-2xl font-bold text-blue-900">{progress}%</span>
-                  <span className="text-sm text-blue-700 ml-2">완료</span>
+                  <span className="text-sm text-blue-700 ml-2">
+                    {status === 'analyzing' ? '완료' : '일시정지'}
+                  </span>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                {processedData.length > 0 && (
-                  <Button
-                    onClick={handlePartialDownload}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 bg-white"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    현재까지 처리된 {processedData.length}개 다운로드
-                  </Button>
-                )}
-                <Button
-                  onClick={() => setShowLivePreview(true)}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white"
-                >
-                  <Table className="h-4 w-4 mr-2" />
-                  실시간 데이터 보기
-                </Button>
               </div>
             </div>
           )}
@@ -1303,18 +1273,18 @@ export default function Home() {
           />
         )}
 
-        {/* 실시간 데이터 미리보기 모달 */}
-        <LivePreviewModal
-          open={showLivePreview}
-          onClose={() => setShowLivePreview(false)}
-          isProcessing={status === 'analyzing' || status === 'generating'}
-        />
 
         {/* 검수 결과 모달 */}
         <ReviewResultsModal
           open={showReviewResults}
           onClose={() => setShowReviewResults(false)}
-          reviewResults={reviewResults}
+          reviewResults={{
+            duplicatesRemoved: bulkReviewResults.duplicatesRemoved,
+            textCorrections: bulkReviewResults.textCorrections,
+            totalProcessed: bulkReviewResults.originalCount,
+            totalDuplicates: bulkReviewResults.duplicatesRemoved.length,
+            totalCorrections: bulkReviewResults.totalCorrections
+          }}
         />
       </div>
     </main>
