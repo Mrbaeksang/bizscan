@@ -258,7 +258,7 @@ export default function Home() {
         // 리뷰 결과 저장
         const reviewHeader = response.headers.get('X-Review-Results')
         if (reviewHeader) {
-          setReviewResults(JSON.parse(reviewHeader))
+          setReviewResults(JSON.parse(decodeURIComponent(reviewHeader)))
         }
         
         console.log(`📊 [BIZSCAN] 엑셀 생성 완료`)

@@ -32,14 +32,14 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename=bizscan_${uniqueData.length}개.xlsx`,
-        'X-Review-Results': JSON.stringify({
+        'Content-Disposition': `attachment; filename=bizscan_${uniqueData.length}_items.xlsx`,
+        'X-Review-Results': encodeURIComponent(JSON.stringify({
           originalCount: rawData.length,
           afterDeduplication: uniqueData.length,
           duplicatesRemoved: duplicatesRemoved,
           textCorrections: [],
           totalCorrections: 0
-        })
+        }))
       }
     })
 
