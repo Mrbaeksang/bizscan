@@ -139,10 +139,14 @@ export default function Home() {
     setProcessedData([])
     cancelRef.current = false
 
-    // 클라이언트 저장소 초기화
-    console.log('🔄 [BIZSCAN] 클라이언트 저장소 초기화 중...')
-    await clientStorage.clearAll()
-    console.log('✅ [BIZSCAN] 클라이언트 저장소 초기화 완료')
+    // 클라이언트 저장소 초기화 (재시도가 아닌 경우만)
+    if (processedData.length === 0) {
+      console.log('🔄 [BIZSCAN] 클라이언트 저장소 초기화 중...')
+      await clientStorage.clearAll()
+      console.log('✅ [BIZSCAN] 클라이언트 저장소 초기화 완료')
+    } else {
+      console.log('🔄 [BIZSCAN] 재시도 모드 - 기존 성공 데이터 유지')
+    }
 
     const totalFiles = files.length
     const results: ExcelRowData[] = []
@@ -216,7 +220,48 @@ export default function Home() {
           const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
           console.error(`❌ [BIZSCAN] 파일 처리 실패: ${file.name}`, error)
           console.log(`❌ [BIZSCAN] 에러 메시지: ${errorMessage}`)
-          failed.push({ name: file.name, error: errorMessage })
+          
+          // 500 에러인 경우 한 번 더 재시도
+          if (errorMessage.includes('500') && !errorMessage.includes('재시도')) {
+            console.log(`🔄 [BIZSCAN] 500 에러 재시도: ${file.name}`)
+            await new Promise(resolve => setTimeout(resolve, 3000)) // 3초 대기
+            
+            try {
+              const retryResponse = await axios.post('/api/extract-single', formData, {
+                headers: {
+                  'Content-Type': 'multipart/form-data'
+                },
+                timeout: 30000
+              })
+              
+              if (retryResponse.data.success) {
+                console.log(`✅ [BIZSCAN] 재시도 성공: ${file.name}`)
+                results.push(retryResponse.data.data)
+                setSuccessCount(prev => prev + 1)
+                
+                await clientStorage.saveResult({
+                  id: `${Date.now()}_${i}`,
+                  fileName: file.name,
+                  data: {
+                    대표자명: retryResponse.data.data.대표자명,
+                    상호명: retryResponse.data.data.상호명,
+                    사업자주소: retryResponse.data.data.사업자주소,
+                    사업자등록번호: retryResponse.data.data.사업자등록번호
+                  },
+                  confidence: 1,
+                  processedAt: new Date(),
+                  status: 'success'
+                })
+              } else {
+                throw new Error('재시도 실패: ' + retryResponse.data.error)
+              }
+            } catch (retryError) {
+              console.error(`❌ [BIZSCAN] 재시도도 실패: ${file.name}`, retryError)
+              failed.push({ name: file.name, error: '재시도 실패: ' + errorMessage })
+            }
+          } else {
+            failed.push({ name: file.name, error: errorMessage })
+          }
           
           // 클라이언트 저장소에 실패 저장
           console.log(`💾 [BIZSCAN] 실패 데이터 저장 중: ${file.name}`)
@@ -298,8 +343,7 @@ export default function Home() {
     setFiles(filesToRetry)
     setStatus('idle')
     setFailedFiles([])
-    setSuccessCount(0)
-    setProcessedData([])
+    // 성공한 데이터는 유지 (초기화 안함)
     setExcelBlob(null)
   }
 
