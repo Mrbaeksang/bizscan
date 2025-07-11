@@ -3,8 +3,11 @@ import { generateExcelFromData } from '@/lib/excel-generator'
 import type { ExcelRowData } from '@/lib/excel-generator'
 
 export async function POST(request: NextRequest) {
+  let rawData: ExcelRowData[] = []
+  
   try {
-    const { rawData } = await request.json()
+    const requestData = await request.json()
+    rawData = requestData.rawData
     
     if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
       return NextResponse.json({ 
@@ -15,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 [BIZSCAN] 일괄 검수 시작 - ${rawData.length}개 데이터`)
 
-    // 1. 딥시크 텍스트 검수 (일괄 처리)
+    // 1. 라마 텍스트 검수 (일괄 처리)
     const reviewedData = await performBulkTextReview(rawData)
     
     // 2. 중복 제거
@@ -44,10 +47,37 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('일괄 검수 중 오류:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: '일괄 검수 중 오류가 발생했습니다.' 
-    })
+    
+    // 에러 발생 시에도 원본 데이터로 엑셀 생성
+    try {
+      console.log('⚠️ [BIZSCAN] 에러 발생, 원본 데이터로 엑셀 생성')
+      // rawData가 정의되지 않은 경우 빈 배열 사용
+      const dataToProcess = rawData || []
+      const { uniqueData, duplicatesRemoved } = removeDuplicates(dataToProcess)
+      const excelBlob = await generateExcelFromData(uniqueData)
+      const buffer = await excelBlob.arrayBuffer()
+      
+      return new NextResponse(buffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename=bizscan_original_${uniqueData.length}.xlsx`,
+          'X-Review-Results': JSON.stringify({
+            originalCount: dataToProcess.length,
+            afterDeduplication: uniqueData.length,
+            duplicatesRemoved: duplicatesRemoved,
+            textCorrections: [],
+            totalCorrections: 0
+          })
+        }
+      })
+    } catch (fallbackError) {
+      console.error('엑셀 생성 완전 실패:', fallbackError)
+      return NextResponse.json({ 
+        success: false, 
+        error: '엑셀 생성 중 오류가 발생했습니다.' 
+      })
+    }
   }
 }
 
@@ -140,16 +170,27 @@ ${index + 1}. 상호명: ${data.companyAndRepresentative}
       
       try {
         // JSON 형식으로 파싱 시도
-        const reviewData = JSON.parse(reviewContent)
+        let cleanContent = reviewContent
+        
+        // 마크다운 코드 블록 제거
+        if (reviewContent.includes('```json')) {
+          cleanContent = reviewContent.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+        } else if (reviewContent.includes('```')) {
+          cleanContent = reviewContent.replace(/```\s*/g, '').trim()
+        }
+        
+        const reviewData = JSON.parse(cleanContent)
         
         console.log(`✅ [BIZSCAN] 일괄 텍스트 검수 성공: ${model}`)
         return {
           correctedData: reviewData.correctedData || rawData,
           corrections: reviewData.corrections || []
         }
-      } catch {
+      } catch (parseError) {
         // JSON 파싱 실패 시 원본 데이터 반환
         console.log(`⚠️ [BIZSCAN] JSON 파싱 실패, 원본 반환: ${model}`)
+        console.log(`파싱 에러:`, parseError)
+        console.log(`응답 내용:`, reviewContent)
         return {
           correctedData: rawData,
           corrections: []
@@ -161,8 +202,8 @@ ${index + 1}. 상호명: ${data.companyAndRepresentative}
     }
   }
   
-  // 모든 모델 실패 시 원본 데이터 반환
-  console.error(`❌ [BIZSCAN] 모든 텍스트 검수 모델 실패`)
+  // 모든 모델 실패 시 원본 데이터 반환 (에러 발생시키지 않음)
+  console.log(`⚠️ [BIZSCAN] 텍스트 검수 실패, 원본 데이터 사용`)
   return {
     correctedData: rawData,
     corrections: []
