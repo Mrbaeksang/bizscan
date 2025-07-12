@@ -70,10 +70,18 @@ function removeDuplicates(data: ExcelRowData[]) {
         if (existingItem.companyAndRepresentative === item.companyAndRepresentative) {
           console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
           
-          // 🔥 메모 병합: 새 아이템에 메모가 있으면 기존 아이템 업데이트
-          if (item.memo && item.memo.trim() !== '') {
-            console.log(`📝 [BIZSCAN] 메모 병합: "${existingItem.memo}" → "${item.memo}"`)
-            existingItem.memo = item.memo
+          // 🔥 메모 병합: 둘 중 메모가 있는 것을 우선 사용
+          const existingMemo = existingItem.memo?.trim() || ''
+          const newMemo = item.memo?.trim() || ''
+          
+          if (newMemo && !existingMemo) {
+            console.log(`📝 [BIZSCAN] 메모 병합 (새→기존): "${existingMemo}" → "${newMemo}"`)
+            existingItem.memo = newMemo
+          } else if (existingMemo && !newMemo) {
+            console.log(`📝 [BIZSCAN] 메모 유지 (기존): "${existingMemo}"`)
+          } else if (newMemo && existingMemo) {
+            console.log(`📝 [BIZSCAN] 메모 병합 (둘 다): "${existingMemo}" + "${newMemo}"`)
+            existingItem.memo = existingMemo + ' | ' + newMemo
           }
           
           duplicatesRemoved.push({
@@ -95,11 +103,19 @@ function removeDuplicates(data: ExcelRowData[]) {
       } else if (companyKey && seen.has(companyKey)) {
         console.log(`🔄 [BIZSCAN] 중복 제거 (상호명 기준): ${item.companyAndRepresentative}`)
         
-        // 🔥 메모 병합: 새 아이템에 메모가 있으면 기존 아이템 업데이트
+        // 🔥 메모 병합: 둘 중 메모가 있는 것을 우선 사용  
         const existingItem = seen.get(companyKey)!
-        if (item.memo && item.memo.trim() !== '') {
-          console.log(`📝 [BIZSCAN] 메모 병합 (상호명 기준): "${existingItem.memo}" → "${item.memo}"`)
-          existingItem.memo = item.memo
+        const existingMemo = existingItem.memo?.trim() || ''
+        const newMemo = item.memo?.trim() || ''
+        
+        if (newMemo && !existingMemo) {
+          console.log(`📝 [BIZSCAN] 메모 병합 (상호명/새→기존): "${existingMemo}" → "${newMemo}"`)
+          existingItem.memo = newMemo
+        } else if (existingMemo && !newMemo) {
+          console.log(`📝 [BIZSCAN] 메모 유지 (상호명/기존): "${existingMemo}"`)
+        } else if (newMemo && existingMemo) {
+          console.log(`📝 [BIZSCAN] 메모 병합 (상호명/둘 다): "${existingMemo}" + "${newMemo}"`)
+          existingItem.memo = existingMemo + ' | ' + newMemo
         }
         
         duplicatesRemoved.push({
