@@ -11,38 +11,63 @@ interface LiveResultsTableProps {
   data: ExcelRowData[]
   progress: number
   totalFiles: number
+  failedCount: number
   onMemoChange: (index: number, memo: string) => void
 }
 
-export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, onMemoChange }: LiveResultsTableProps) {
+export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, failedCount, onMemoChange }: LiveResultsTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20 // 한 페이지당 20개씩
+  
+  // 영업 상태별 데이터 분류
+  const { operationalData, nonOperationalData } = useMemo(() => {
+    const operational: ExcelRowData[] = []
+    const nonOperational: ExcelRowData[] = []
+    
+    data.forEach(item => {
+      const isOperationalText = String(item.isOperational || '')
+      const hasDelivery = isOperationalText.includes('땡겨요(가능)') || 
+                         isOperationalText.includes('요기요(가능)') || 
+                         isOperationalText.includes('쿠팡이츠(가능)')
+      
+      if (hasDelivery) {
+        operational.push(item)
+      } else {
+        nonOperational.push(item)
+      }
+    })
+    
+    return { operationalData: operational, nonOperationalData: nonOperational }
+  }, [data])
+  
+  // 미리보기에는 영업 가능한 데이터만 표시
+  const filteredData = operationalData
   
   // 페이지네이션 계산
   const { paginatedData, totalPages, startIndex, endIndex } = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
     const end = start + itemsPerPage
-    const paginated = data.slice(start, end)
-    const pages = Math.ceil(data.length / itemsPerPage)
+    const paginated = filteredData.slice(start, end)
+    const pages = Math.ceil(filteredData.length / itemsPerPage)
     
     return {
       paginatedData: paginated,
       totalPages: pages,
       startIndex: start,
-      endIndex: Math.min(end, data.length)
+      endIndex: Math.min(end, filteredData.length)
     }
-  }, [data, currentPage, itemsPerPage])
+  }, [filteredData, currentPage, itemsPerPage])
 
   // 새 데이터가 추가되면 마지막 페이지로 이동 (사용자가 첫 페이지에 있을 때만)
   React.useEffect(() => {
-    if (data.length > 0) {
-      const lastPage = Math.ceil(data.length / itemsPerPage)
+    if (filteredData.length > 0) {
+      const lastPage = Math.ceil(filteredData.length / itemsPerPage)
       // 현재 페이지가 1페이지이거나 초기 상태일 때만 마지막 페이지로 이동
       if (currentPage === 1) {
         setCurrentPage(lastPage)
       }
     }
-  }, [data.length, itemsPerPage, currentPage])
+  }, [filteredData.length, itemsPerPage, currentPage])
 
   if (!isOpen) return null
 
@@ -54,7 +79,8 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
           <div>
             <h2 className="text-xl font-semibold">실시간 처리 결과</h2>
             <p className="text-sm text-gray-600 mt-1">
-              진행률: {Math.round(progress)}% ({data.length}/{totalFiles}개 완료)
+              진행률: {Math.round(progress)}% ({data.length}/{totalFiles}개 완료) | 
+              영업 가능: {operationalData.length}개, 영업 불가: {nonOperationalData.length}개, 실패: {failedCount}개
               {totalPages > 1 && ` | 페이지 ${currentPage}/${totalPages} (${startIndex + 1}-${endIndex})`}
             </p>
           </div>

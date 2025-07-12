@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
-import { DiscardedFilesModal } from '@/components/discarded-files-modal'
 import { ReviewResultsModal } from '@/components/review-results-modal'
 import { LiveResultsTable } from '@/components/live-results-table'
 import { Button } from '@/components/ui/button'
@@ -29,13 +28,11 @@ export default function Home() {
   const [status, setStatus] = useState<Status>('idle')
   const [successData, setSuccessData] = useState<ExcelRowData[]>([])
   const [failedFiles, setFailedFiles] = useState<{name: string, error: string}[]>([])
-  const [discardedFiles, setDiscardedFiles] = useState<{name: string, reason: string}[]>([])
   const [progress, setProgress] = useState(0)
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null)
   
   // UI 상태
   const [showFailedModal, setShowFailedModal] = useState(false)
-  const [showDiscardedModal, setShowDiscardedModal] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [showLivePreview, setShowLivePreview] = useState(false)
   const [reviewResults, setReviewResults] = useState<{
@@ -181,20 +178,10 @@ export default function Home() {
       try {
         const processedData = await processFile(file)
         
-        // 배달앱 3개가 모두 불가능한 경우 폐기
-        const isOperationalText = String(processedData.isOperational || '')
-        const hasDelivery = isOperationalText.includes('땡겨요(가능)') || 
-                           isOperationalText.includes('요기요(가능)') || 
-                           isOperationalText.includes('쿠팡이츠(가능)')
+        results.push(processedData)
+        setSuccessData([...results])
         
-        if (hasDelivery) {
-          results.push(processedData)
-          setSuccessData([...results])
-          console.log(`✅ [BIZSCAN] 성공: ${file.name}`)
-        } else {
-          setDiscardedFiles(prev => [...prev, { name: file.name, reason: '배달앱 3개 모두 불가능' }])
-          console.log(`🗑️ [BIZSCAN] 폐기 (배달앱 없음): ${file.name}`)
-        }
+        console.log(`✅ [BIZSCAN] 성공: ${file.name}`)
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : '처리 실패'
         failed.push({ name: file.name, error: errorMsg })
@@ -341,7 +328,6 @@ export default function Home() {
     setStatus('idle')
     setSuccessData([])
     setFailedFiles([])
-    setDiscardedFiles([])
     setProgress(0)
     setExcelBlob(null)
     setReviewResults(null)
@@ -440,7 +426,7 @@ export default function Home() {
                 />
               </div>
               <div className="mt-2 text-sm text-gray-600">
-                성공: {successData.length}개 | 실패: {failedFiles.length}개 | 폐기: {discardedFiles.length}개
+                성공: {successData.length}개 | 실패: {failedFiles.length}개
               </div>
             </div>
           )}
@@ -518,17 +504,6 @@ export default function Home() {
               </Button>
             )}
 
-            {/* 폐기 파일 버튼 */}
-            {discardedFiles.length > 0 && (
-              <Button 
-                onClick={() => setShowDiscardedModal(true)} 
-                variant="outline"
-                className="text-orange-600 hover:bg-orange-50"
-              >
-                <AlertCircle className="w-4 h-4 mr-2" />
-                폐기 파일 ({discardedFiles.length}개)
-              </Button>
-            )}
 
             {/* 초기화 버튼 */}
             <Button 
@@ -561,7 +536,7 @@ export default function Home() {
             <Alert className="mt-6">
               <CheckCircle2 className="h-4 w-4" />
               <AlertDescription>
-                모든 파일 처리가 완료되었습니다! 성공: {successData.length}개, 실패: {failedFiles.length}개, 폐기: {discardedFiles.length}개
+                모든 파일 처리가 완료되었습니다! 성공: {successData.length}개, 실패: {failedFiles.length}개
               </AlertDescription>
             </Alert>
           )}
@@ -575,11 +550,6 @@ export default function Home() {
         failedFiles={failedFiles}
       />
 
-      <DiscardedFilesModal 
-        open={showDiscardedModal}
-        onClose={() => setShowDiscardedModal(false)}
-        discardedFiles={discardedFiles}
-      />
 
       <ReviewResultsModal 
         open={showReviewModal}
@@ -593,6 +563,7 @@ export default function Home() {
         data={successData}
         progress={progress}
         totalFiles={files.length}
+        failedCount={failedFiles.length}
         onMemoChange={handleMemoChange}
       />
     </div>

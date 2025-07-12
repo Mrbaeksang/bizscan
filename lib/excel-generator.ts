@@ -54,8 +54,24 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     return { ddangyo, yogiyo, coupangeats }
   }
 
+  // 데이터 정렬: 배달앱 가능한 것을 먼저, 불가능한 것을 뒤로
+  const sortedData = [...data].sort((a, b) => {
+    const aText = String(a.isOperational || '')
+    const bText = String(b.isOperational || '')
+    
+    const aHasDelivery = aText.includes('땡겨요(가능)') || 
+                        aText.includes('요기요(가능)') || 
+                        aText.includes('쿠팡이츠(가능)')
+    const bHasDelivery = bText.includes('땡겨요(가능)') || 
+                        bText.includes('요기요(가능)') || 
+                        bText.includes('쿠팡이츠(가능)')
+    
+    // 배달 가능한 것을 먼저 (0), 불가능한 것을 뒤로 (1)
+    return Number(!aHasDelivery) - Number(!bHasDelivery)
+  })
+
   // 데이터 추가 (가독성 최적화)
-  data.forEach((row, index) => {
+  sortedData.forEach((row, index) => {
     const isOperationalText = String(row.isOperational || '')
     const deliveryStatus = parseDeliveryStatus(isOperationalText)
     
@@ -198,8 +214,24 @@ export async function generatePartialExcel(
     return { ddangyo, yogiyo, coupangeats }
   }
 
+  // 데이터 정렬: 배달앱 가능한 것을 먼저, 불가능한 것을 뒤로
+  const sortedData = [...data].sort((a, b) => {
+    const aText = String(a.isOperational || '')
+    const bText = String(b.isOperational || '')
+    
+    const aHasDelivery = aText.includes('땡겨요(가능)') || 
+                        aText.includes('요기요(가능)') || 
+                        aText.includes('쿠팡이츠(가능)')
+    const bHasDelivery = bText.includes('땡겨요(가능)') || 
+                        bText.includes('요기요(가능)') || 
+                        bText.includes('쿠팡이츠(가능)')
+    
+    // 배달 가능한 것을 먼저 (0), 불가능한 것을 뒤로 (1)
+    return Number(!aHasDelivery) - Number(!bHasDelivery)
+  })
+
   // 데이터 추가 (메인과 동일한 스타일)
-  data.forEach((row, index) => {
+  sortedData.forEach((row, index) => {
     const isOperationalText = String(row.isOperational || '')
     const deliveryStatus = parseDeliveryStatus(isOperationalText)
     
