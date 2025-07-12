@@ -299,6 +299,115 @@ function formatDeliveryStatus(status: DeliveryStatus): string {
   ].join(' / ')
 }
 
+// AI가 웹 검색으로 업체 정보 수집
+async function searchBusinessInfo(companyName: string, address: string): Promise<{phoneNumber: string, openTime: string}> {
+  try {
+    const apiKeys = process.env.OPENROUTER_API_KEY?.split(',').map(key => key.trim()) || []
+    const primaryApiKey = apiKeys[0] || process.env.OPENROUTER_API_KEY
+    
+    if (!primaryApiKey) {
+      console.log(`🔍 [AI SEARCH] OpenRouter API 키가 설정되지 않음`)
+      return { phoneNumber: '', openTime: '' }
+    }
+
+    // 지역명 추출하여 검색 프롬프트 구성
+    const region = extractRegionFromAddress(address)
+    const searchPrompt = `다음 업체의 전화번호와 영업시간을 네이버나 구글에서 검색해서 찾아주세요:
+
+업체명: ${companyName}
+주소: ${address}
+지역: ${region}
+
+인터넷에서 이 업체를 검색해서 다음 정보를 JSON 형식으로 제공해주세요:
+- phoneNumber: 전화번호 (없으면 빈 문자열)
+- openTime: 영업시간 (없으면 빈 문자열)
+
+응답 예시:
+{
+  "phoneNumber": "031-123-4567",
+  "openTime": "09:00-22:00"
+}
+
+반드시 JSON 형식으로만 응답하고, 다른 설명은 포함하지 마세요.`
+    
+    console.log(`🔍 [AI SEARCH] AI에게 검색 요청: ${companyName} (${region})`)
+    
+    const requestBody = {
+      model: 'google/gemini-2.0-flash-lite-001',
+      messages: [
+        {
+          role: 'user',
+          content: searchPrompt
+        }
+      ]
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${primaryApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://bizscan.vercel.app',
+        'X-Title': 'BizScan'
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      const errorData = await response.text()
+      console.log(`🔍 [AI SEARCH] API 요청 실패: ${response.status} - ${errorData}`)
+      return { phoneNumber: '', openTime: '' }
+    }
+
+    const data = await response.json()
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.log(`🔍 [AI SEARCH] 잘못된 API 응답 구조`)
+      return { phoneNumber: '', openTime: '' }
+    }
+    
+    const content = data.choices[0].message.content
+    console.log('🔍 [AI SEARCH] AI 원본 응답:', content)
+    
+    // JSON 파싱 (마크다운 코드 블록 제거)
+    let cleanContent = content
+    
+    if (content.includes('```json')) {
+      cleanContent = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    } else if (content.includes('```')) {
+      cleanContent = content.replace(/```\s*/g, '').trim()
+    }
+    
+    console.log('🔍 [AI SEARCH] 정리된 JSON:', cleanContent)
+    
+    const businessInfo = JSON.parse(cleanContent)
+    console.log('🔍 [AI SEARCH] 파싱된 정보:', businessInfo)
+
+    return {
+      phoneNumber: businessInfo.phoneNumber || '',
+      openTime: businessInfo.openTime || ''
+    }
+    
+  } catch (error) {
+    console.log(`🔍 [AI SEARCH] 검색 에러:`, error)
+    return { phoneNumber: '', openTime: '' }
+  }
+}
+
+// 주소에서 지역명 추출
+function extractRegionFromAddress(address: string): string {
+  if (!address) return ''
+  
+  const parts = address.split(' ')
+  // "충청북도 진천군 진천읍" -> "진천군" 또는 "진천"
+  if (parts.length >= 3) {
+    return parts[2].replace(/읍|면|동$/g, '') // 읍면동 제거
+  } else if (parts.length >= 2) {
+    return parts[1].replace(/군|시|구$/g, '') // 군시구 제거  
+  }
+  return parts[0] || ''
+}
+
 export async function POST(req: NextRequest) {
   // IP 체크 (선택사항)
   const clientIP = getClientIP(req)
@@ -328,6 +437,11 @@ export async function POST(req: NextRequest) {
     const deliveryStatus = await checkDeliveryApps(data.사업자등록번호)
     console.log(`📋 [BIZSCAN] 배달앱 확인 결과:`, JSON.stringify(deliveryStatus))
     
+    // AI 웹 검색으로 업체 정보 수집
+    console.log(`📋 [BIZSCAN] AI 웹 검색으로 업체 정보 수집 시작`)
+    const businessInfo = await searchBusinessInfo(data.상호명, data.사업자주소)
+    console.log(`📋 [BIZSCAN] AI 검색 결과:`, businessInfo)
+    
     // 모든 배달앱에 이미 입점된 경우 필터링
     if (isAllRegistered(deliveryStatus)) {
       console.log(`📋 [BIZSCAN] 모든 배달앱 입점으로 필터링됨: ${data.사업자등록번호}`)
@@ -340,11 +454,11 @@ export async function POST(req: NextRequest) {
     // 성공한 데이터 변환
     const mappedData = {
       companyAndRepresentative: data.상호명 || '',
-      openTime: '',
+      openTime: businessInfo.openTime,
       memo: '',
       address: data.사업자주소 || '',
       businessRegistrationNumber: data.사업자등록번호 || '',
-      phoneNumber: '',
+      phoneNumber: businessInfo.phoneNumber,
       isOperational: formatDeliveryStatus(deliveryStatus),
       상호명: data.상호명,
       사업자주소: data.사업자주소,
