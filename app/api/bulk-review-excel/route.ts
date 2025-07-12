@@ -69,6 +69,13 @@ function removeDuplicates(data: ExcelRowData[]) {
         // 상호명까지 비교하여 완전히 같은 경우만 중복으로 처리
         if (existingItem.companyAndRepresentative === item.companyAndRepresentative) {
           console.log(`🔄 [BIZSCAN] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
+          
+          // 🔥 메모 병합: 새 아이템에 메모가 있으면 기존 아이템 업데이트
+          if (item.memo && item.memo.trim() !== '') {
+            console.log(`📝 [BIZSCAN] 메모 병합: "${existingItem.memo}" → "${item.memo}"`)
+            existingItem.memo = item.memo
+          }
+          
           duplicatesRemoved.push({
             companyName: item.companyAndRepresentative,
             businessNumber: item.businessRegistrationNumber
@@ -87,6 +94,14 @@ function removeDuplicates(data: ExcelRowData[]) {
         uniqueData.push(item)
       } else if (companyKey && seen.has(companyKey)) {
         console.log(`🔄 [BIZSCAN] 중복 제거 (상호명 기준): ${item.companyAndRepresentative}`)
+        
+        // 🔥 메모 병합: 새 아이템에 메모가 있으면 기존 아이템 업데이트
+        const existingItem = seen.get(companyKey)!
+        if (item.memo && item.memo.trim() !== '') {
+          console.log(`📝 [BIZSCAN] 메모 병합 (상호명 기준): "${existingItem.memo}" → "${item.memo}"`)
+          existingItem.memo = item.memo
+        }
+        
         duplicatesRemoved.push({
           companyName: item.companyAndRepresentative,
           businessNumber: item.businessRegistrationNumber || '없음'
