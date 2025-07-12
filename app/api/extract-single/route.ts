@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClientIP, isAllowedIP } from '@/lib/ip-check'
+import sharp from 'sharp'
 
 // 시스템 프롬프트 정의
 const SYSTEM_PROMPT = `당신은 대한민국 사업자등록증 이미지 분석 전문가입니다.
@@ -38,10 +39,25 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
     throw new Error('OPENROUTER_API_KEY is not set')
   }
 
-  const base64Image = imageBuffer.toString('base64')
+  // 이미지 크기 최적화 (1MB 이상이면 압축)
+  let optimizedBuffer = imageBuffer
+  if (imageBuffer.length > 1024 * 1024) {
+    try {
+      optimizedBuffer = await sharp(imageBuffer)
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer()
+      console.log(`🖼️ [BIZSCAN] 이미지 압축: ${imageBuffer.length} → ${optimizedBuffer.length} bytes`)
+    } catch (error) {
+      console.log(`🖼️ [BIZSCAN] 이미지 압축 실패, 원본 사용:`, error)
+      optimizedBuffer = imageBuffer
+    }
+  }
 
-  // 단일 모델 사용
-  const models = ['google/gemini-2.0-flash-lite-001']
+  const base64Image = optimizedBuffer.toString('base64')
+
+  // 더 빠른 모델 우선 사용
+  const models = ['google/gemini-2.0-flash-lite-001', 'anthropic/claude-3-haiku']
   
   console.log(`🎯 [BIZSCAN] 사용할 모델 순위: ${models.join(' → ')}`)
 
@@ -72,6 +88,10 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
       }
 
       try {
+        // AbortController로 타임아웃 설정 (8초)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 8000)
+
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -80,8 +100,11 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
             'HTTP-Referer': 'https://bizscan.vercel.app',
             'X-Title': 'BizScan'
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
         })
+
+        clearTimeout(timeoutId)
 
         if (!response.ok) {
           const errorData = await response.text()
@@ -124,12 +147,20 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
       } catch (error) {
         lastError = error as Error
         
+        // AbortError (타임아웃)인 경우 다음 모델로 빠르게 이동
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log(`⏱️ [BIZSCAN] ${model} 타임아웃, 다음 모델 시도`)
+          continue
+        }
+        
         // 429 에러인 경우 다음 모델 시도 (대기시간 단축)
         if (error instanceof Error && error.message.includes('429')) {
+          console.log(`🔄 [BIZSCAN] ${model} 요청 제한, 다음 모델 시도`)
           await new Promise(resolve => setTimeout(resolve, 500))
           continue
         }
         
+        console.log(`❌ [BIZSCAN] ${model} 실패:`, error instanceof Error ? error.message : error)
         continue
       }
     }
@@ -357,6 +388,10 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
       temperature: 0.1 // 더 일관성 있는 응답을 위해 낮은 temperature
     }
 
+    // AbortController로 타임아웃 설정 (5초)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -365,8 +400,11 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
         'HTTP-Referer': 'https://bizscan.vercel.app',
         'X-Title': 'BizScan'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
     })
+
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       const errorData = await response.text()
