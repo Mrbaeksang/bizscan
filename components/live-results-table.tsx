@@ -33,13 +33,16 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
     }
   }, [data, currentPage, itemsPerPage])
 
-  // 새 데이터가 추가되면 마지막 페이지로 이동
+  // 새 데이터가 추가되면 마지막 페이지로 이동 (사용자가 첫 페이지에 있을 때만)
   React.useEffect(() => {
     if (data.length > 0) {
       const lastPage = Math.ceil(data.length / itemsPerPage)
-      setCurrentPage(lastPage)
+      // 현재 페이지가 1페이지이거나 초기 상태일 때만 마지막 페이지로 이동
+      if (currentPage === 1) {
+        setCurrentPage(lastPage)
+      }
     }
-  }, [data.length, itemsPerPage])
+  }, [data.length, itemsPerPage, currentPage])
 
   if (!isOpen) return null
 
@@ -70,7 +73,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-blue-600 text-white">
+                  <tr className="bg-pink-600 text-white">
                     <th className="border border-gray-300 px-3 py-2 text-left font-medium">🏪 상호명</th>
                     <th className="border border-gray-300 px-3 py-2 text-left font-medium">📝 메모</th>
                     <th className="border border-gray-300 px-3 py-2 text-center font-medium">📞 전화번호</th>
@@ -97,7 +100,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
 
                     return (
                       <tr key={actualIndex} className={pageIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                        <td className="border border-gray-300 px-3 py-2">{row.companyAndRepresentative}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-left font-bold">{row.companyAndRepresentative}</td>
                         <td className="border border-gray-300 px-1 py-1">
                           <input
                             type="text"
@@ -107,10 +110,10 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                             placeholder="메모 입력..."
                           />
                         </td>
-                        <td className="border border-gray-300 px-3 py-2 text-center">{row.phoneNumber}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-center">{row.openTime}</td>
-                        <td className="border border-gray-300 px-3 py-2">{row.address}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-center font-mono">{row.businessRegistrationNumber}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-left font-bold">{row.phoneNumber}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-left font-bold">{row.openTime}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-left font-bold">{row.address}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-left font-bold font-mono">{row.businessRegistrationNumber}</td>
                         <td className="border border-gray-300 px-3 py-2 text-center">
                           <span className={`font-bold ${deliveryStatus.ddangyo === '✅' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'} px-2 py-1 rounded text-sm`}>
                             {deliveryStatus.ddangyo}

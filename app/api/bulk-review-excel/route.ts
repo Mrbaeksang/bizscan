@@ -18,8 +18,9 @@ export async function POST(request: NextRequest) {
     console.log(`📋 [BIZSCAN] 원본 데이터 샘플:`, JSON.stringify(rawData[0], null, 2))
     console.log(`📋 [BIZSCAN] 모든 데이터:`, JSON.stringify(rawData, null, 2))
 
-    // 텍스트 검수 건너뛰고 바로 중복 제거 및 엑셀 생성
-    const { uniqueData, duplicatesRemoved } = removeDuplicates(rawData)
+    // 배달앱 필터링 후 중복 제거 및 엑셀 생성
+    const filteredData = filterDeliveryData(rawData)
+    const { uniqueData, duplicatesRemoved } = removeDuplicates(filteredData)
     console.log(`🔄 [BIZSCAN] 중복 제거 완료 - ${uniqueData.length}개 남음`)
     
     console.log(`📊 [BIZSCAN] 엑셀 생성 함수 호출 중...`)
@@ -53,6 +54,20 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function filterDeliveryData(data: ExcelRowData[]): ExcelRowData[] {
+  return data.filter(item => {
+    const isOperationalText = String(item.isOperational || '')
+    const hasDelivery = isOperationalText.includes('땡겨요(가능)') || 
+                       isOperationalText.includes('요기요(가능)') || 
+                       isOperationalText.includes('쿠팡이츠(가능)')
+    
+    if (!hasDelivery) {
+      console.log(`🗑️ [BIZSCAN] 엑셀에서 폐기 (배달앱 없음): ${item.companyAndRepresentative}`)
+    }
+    
+    return hasDelivery
+  })
+}
 
 function removeDuplicates(data: ExcelRowData[]) {
   const seen = new Map<string, ExcelRowData>()

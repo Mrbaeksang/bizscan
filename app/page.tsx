@@ -177,10 +177,20 @@ export default function Home() {
       
       try {
         const processedData = await processFile(file)
-        results.push(processedData)
-        setSuccessData([...results])
         
-        console.log(`✅ [BIZSCAN] 성공: ${file.name}`)
+        // 배달앱 3개가 모두 불가능한 경우 폐기
+        const isOperationalText = String(processedData.isOperational || '')
+        const hasDelivery = isOperationalText.includes('땡겨요(가능)') || 
+                           isOperationalText.includes('요기요(가능)') || 
+                           isOperationalText.includes('쿠팡이츠(가능)')
+        
+        if (hasDelivery) {
+          results.push(processedData)
+          setSuccessData([...results])
+          console.log(`✅ [BIZSCAN] 성공: ${file.name}`)
+        } else {
+          console.log(`🗑️ [BIZSCAN] 폐기 (배달앱 없음): ${file.name}`)
+        }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : '처리 실패'
         failed.push({ name: file.name, error: errorMsg })
