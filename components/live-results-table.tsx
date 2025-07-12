@@ -113,8 +113,12 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                 </thead>
                 <tbody>
                   {paginatedData.map((row, pageIndex) => {
-                    // 페이지네이션 고려한 실제 인덱스 계산
-                    const actualIndex = startIndex + pageIndex
+                    // 필터링된 데이터에서 전체 데이터의 실제 인덱스 찾기
+                    const actualIndex = data.findIndex(item => 
+                      item.companyAndRepresentative === row.companyAndRepresentative &&
+                      item.businessRegistrationNumber === row.businessRegistrationNumber &&
+                      item.phoneNumber === row.phoneNumber
+                    )
                     // 배달앱 상태 파싱
                     const parseDeliveryStatus = (isOperational: string) => {
                       const ddangyo = isOperational.includes('땡겨요(가능)') ? '✅' : '❌'
