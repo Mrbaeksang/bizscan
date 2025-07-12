@@ -552,11 +552,15 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const totalTime = Date.now() - startTime
     console.error(`❌ [BIZSCAN] API 실패 (${totalTime}ms):`, error)
+    console.error(`❌ [BIZSCAN] 에러 스택:`, error instanceof Error ? error.stack : 'No stack trace')
+    console.error(`❌ [BIZSCAN] 에러 타입:`, typeof error)
+    console.error(`❌ [BIZSCAN] 에러 상세:`, JSON.stringify(error, null, 2))
     
     return NextResponse.json(
       { 
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to process image' 
+        error: error instanceof Error ? error.message : 'Failed to process image',
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     )
