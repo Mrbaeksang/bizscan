@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { X } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { ExcelRowData } from '@/lib/excel-generator'
 
@@ -11,9 +11,36 @@ interface LiveResultsTableProps {
   data: ExcelRowData[]
   progress: number
   totalFiles: number
+  onMemoChange: (index: number, memo: string) => void
 }
 
-export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles }: LiveResultsTableProps) {
+export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, onMemoChange }: LiveResultsTableProps) {
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20 // 한 페이지당 20개씩
+  
+  // 페이지네이션 계산
+  const { paginatedData, totalPages, startIndex, endIndex } = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    const end = start + itemsPerPage
+    const paginated = data.slice(start, end)
+    const pages = Math.ceil(data.length / itemsPerPage)
+    
+    return {
+      paginatedData: paginated,
+      totalPages: pages,
+      startIndex: start,
+      endIndex: Math.min(end, data.length)
+    }
+  }, [data, currentPage, itemsPerPage])
+
+  // 새 데이터가 추가되면 마지막 페이지로 이동
+  React.useEffect(() => {
+    if (data.length > 0) {
+      const lastPage = Math.ceil(data.length / itemsPerPage)
+      setCurrentPage(lastPage)
+    }
+  }, [data.length, itemsPerPage])
+
   if (!isOpen) return null
 
   return (
@@ -25,6 +52,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles }
             <h2 className="text-xl font-semibold">실시간 처리 결과</h2>
             <p className="text-sm text-gray-600 mt-1">
               진행률: {Math.round(progress)}% ({data.length}/{totalFiles}개 완료)
+              {totalPages > 1 && ` | 페이지 ${currentPage}/${totalPages} (${startIndex + 1}-${endIndex})`}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -55,7 +83,8 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles }
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((row, index) => {
+                  {paginatedData.map((row, pageIndex) => {
+                    const actualIndex = startIndex + pageIndex // 실제 데이터 인덱스
                     // 배달앱 상태 파싱
                     const parseDeliveryStatus = (isOperational: string) => {
                       const ddangyo = isOperational.includes('땡겨요(가능)') ? '✅' : '❌'
@@ -67,7 +96,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles }
                     const deliveryStatus = parseDeliveryStatus(row.isOperational)
 
                     return (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <tr key={actualIndex} className={pageIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                         <td className="border border-gray-300 px-3 py-2">{row.companyAndRepresentative}</td>
                         <td className="border border-gray-300 px-3 py-2 text-center">{row.phoneNumber}</td>
                         <td className="border border-gray-300 px-3 py-2 text-center">{row.openTime}</td>
@@ -88,7 +117,15 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles }
                             {deliveryStatus.coupangeats}
                           </span>
                         </td>
-                        <td className="border border-gray-300 px-3 py-2">{row.memo}</td>
+                        <td className="border border-gray-300 px-1 py-1">
+                          <input
+                            type="text"
+                            value={row.memo}
+                            onChange={(e) => onMemoChange(actualIndex, e.target.value)}
+                            className="w-full px-2 py-1 border-0 bg-transparent focus:bg-white focus:border focus:border-blue-500 rounded"
+                            placeholder="메모 입력..."
+                          />
+                        </td>
                       </tr>
                     )
                   })}
@@ -101,12 +138,44 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles }
         {/* 푸터 */}
         <div className="p-6 border-t bg-gray-50">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">
-              💡 처리가 완료되면 엑셀 다운로드 버튼이 활성화됩니다.
-            </p>
-            <Button onClick={onClose}>
-              닫기
-            </Button>
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-gray-600">
+                💡 메모를 입력하면 자동 저장됩니다. 최종 엑셀에 포함됩니다.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <span className="text-sm px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              
+              <Button onClick={onClose}>
+                닫기
+              </Button>
+            </div>
           </div>
         </div>
       </div>

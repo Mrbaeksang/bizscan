@@ -294,6 +294,17 @@ export default function Home() {
     }
   }
 
+  // 메모 변경 함수
+  const handleMemoChange = (index: number, memo: string) => {
+    setSuccessData(prev => {
+      const updated = [...prev]
+      if (updated[index]) {
+        updated[index] = { ...updated[index], memo }
+      }
+      return updated
+    })
+  }
+
   // 초기화
   const resetAll = () => {
     setFiles([])
@@ -530,6 +541,7 @@ export default function Home() {
         data={successData}
         progress={progress}
         totalFiles={files.length}
+        onMemoChange={handleMemoChange}
       />
     </div>
   )
