@@ -189,10 +189,19 @@ export default function Home() {
         console.log(`✅ [BIZSCAN] 성공: ${file.name}`)
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : '처리 실패'
-        failed.push({ name: file.name, error: errorMsg })
-        setFailedFiles(prev => [...prev, { name: file.name, error: errorMsg }])
-        
         console.log(`❌ [BIZSCAN] 실패: ${file.name} - ${errorMsg}`)
+        
+        // 실패한 파일을 맨 뒤로 이동 (최대 3번까지만 재시도)
+        const retryCount = (file as any).retryCount || 0
+        if (retryCount < 3) {
+          console.log(`🔄 [BIZSCAN] 재시도 ${retryCount + 1}/3: ${file.name}`)
+          const retryFile = { ...file, retryCount: retryCount + 1 } as any
+          setFiles(prev => [...prev, retryFile]) // 맨 뒤에 추가
+        } else {
+          console.log(`💀 [BIZSCAN] 최종 실패: ${file.name}`)
+          failed.push({ name: file.name, error: errorMsg })
+          setFailedFiles(prev => [...prev, { name: file.name, error: errorMsg }])
+        }
       }
       
       // 진행률 업데이트
