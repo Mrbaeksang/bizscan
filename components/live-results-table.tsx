@@ -41,7 +41,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
   }, [data])
   
   // 모든 데이터 표시 (영업 가능한 것을 먼저 정렬)
-  const filteredData = [...operationalData, ...nonOperationalData]
+  const filteredData = useMemo(() => [...operationalData, ...nonOperationalData], [operationalData, nonOperationalData])
   
   // 페이지네이션 계산
   const { paginatedData, totalPages, startIndex, endIndex } = useMemo(() => {

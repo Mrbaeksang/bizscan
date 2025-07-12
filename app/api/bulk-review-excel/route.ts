@@ -53,20 +53,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function filterDeliveryData(data: ExcelRowData[]): ExcelRowData[] {
-  return data.filter(item => {
-    const isOperationalText = String(item.isOperational || '')
-    const hasDelivery = isOperationalText.includes('땡겨요(가능)') || 
-                       isOperationalText.includes('요기요(가능)') || 
-                       isOperationalText.includes('쿠팡이츠(가능)')
-    
-    if (!hasDelivery) {
-      console.log(`🗑️ [BIZSCAN] 엑셀에서 폐기 (배달앱 없음): ${item.companyAndRepresentative}`)
-    }
-    
-    return hasDelivery
-  })
-}
 
 function removeDuplicates(data: ExcelRowData[]) {
   const seen = new Map<string, ExcelRowData>()
