@@ -113,11 +113,11 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                 </thead>
                 <tbody>
                   {paginatedData.map((row, pageIndex) => {
-                    // 필터링된 데이터에서 전체 데이터의 실제 인덱스 찾기
+                    // filteredData에서 현재 아이템의 인덱스
+                    const filteredIndex = startIndex + pageIndex
+                    // 전체 data 배열에서 실제 인덱스 찾기 (고유키 기반)
                     const actualIndex = data.findIndex(item => 
-                      item.companyAndRepresentative === row.companyAndRepresentative &&
-                      item.businessRegistrationNumber === row.businessRegistrationNumber &&
-                      item.phoneNumber === row.phoneNumber
+                      item === filteredData[filteredIndex]
                     )
                     // 배달앱 상태 파싱
                     const parseDeliveryStatus = (isOperational: string) => {
