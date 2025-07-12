@@ -254,10 +254,19 @@ export default function Home() {
       console.log(`🔍 [BIZSCAN] 엑셀 생성 API 호출 시작 - ${data.length}개 데이터`)
       console.log(`📝 [BIZSCAN] 메모 데이터 상세:`, data.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
       
+      // 🔥 API 호출 전 마지막 체크: 메모가 있는 항목 수 계산
+      const itemsWithMemo = data.filter(item => item.memo && item.memo.trim() !== '')
+      console.log(`🔥 [BIZSCAN] API 호출 전 메모 보유 항목: ${itemsWithMemo.length}/${data.length}개`)
+      console.log(`🔥 [BIZSCAN] 메모 보유 항목 상세:`, itemsWithMemo.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo })))
+      
+      // 🔥 rawData 최종 확인
+      const requestBody = { rawData: data }
+      console.log(`🔥 [BIZSCAN] 최종 전송 데이터:`, JSON.stringify(requestBody, null, 2))
+      
       const response = await fetch('/api/bulk-review-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawData: data })
+        body: JSON.stringify(requestBody)
       })
       
       console.log(`📋 [BIZSCAN] API 응답 상태: ${response.status}`)
@@ -300,6 +309,11 @@ export default function Home() {
     console.log('📊 [BIZSCAN] 현재 successData 길이:', successData.length)
     console.log('📊 [BIZSCAN] 현재 메모 데이터:', successData.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
     
+    // 🔥 메모가 있는 항목 체크
+    const itemsWithMemo = successData.filter(item => item.memo && item.memo.trim() !== '')
+    console.log(`🔥 [BIZSCAN] generateLatestExcel - 메모 보유 항목: ${itemsWithMemo.length}/${successData.length}개`)
+    console.log(`🔥 [BIZSCAN] generateLatestExcel - 메모 보유 상세:`, itemsWithMemo.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo })))
+    
     if (!successData || successData.length === 0) {
       alert('생성할 데이터가 없습니다.');
       return;
@@ -339,12 +353,25 @@ export default function Home() {
     setExcelBlob(null)
     
     setSuccessData(prev => {
+      console.log(`🔥 [BIZSCAN] handleMemoChange - 기존 successData 길이: ${prev.length}`)
+      console.log(`🔥 [BIZSCAN] handleMemoChange - 변경 대상 index: ${index}`)
+      console.log(`🔥 [BIZSCAN] handleMemoChange - 변경 전 대상 항목:`, prev[index] ? { 상호명: prev[index].companyAndRepresentative, 메모: prev[index].memo } : '항목 없음')
+      
       const updated = [...prev]
       if (updated[index]) {
         console.log(`📝 [BIZSCAN] 기존 메모: "${updated[index].memo}" → 새 메모: "${memo}"`)
         updated[index] = { ...updated[index], memo }
+        
+        console.log(`🔥 [BIZSCAN] handleMemoChange - 변경 후 대상 항목:`, { 상호명: updated[index].companyAndRepresentative, 메모: updated[index].memo })
+      } else {
+        console.error(`🔥 [BIZSCAN] handleMemoChange - index ${index}에 항목이 없음 (총 ${updated.length}개)`)
       }
-      console.log(`📝 [BIZSCAN] 업데이트된 데이터:`, updated.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo })))
+      
+      // 🔥 메모가 있는 항목 수 체크
+      const itemsWithMemo = updated.filter(item => item.memo && item.memo.trim() !== '')
+      console.log(`🔥 [BIZSCAN] handleMemoChange - 업데이트 후 메모 보유 항목: ${itemsWithMemo.length}/${updated.length}개`)
+      console.log(`🔥 [BIZSCAN] handleMemoChange - 업데이트 후 메모 보유 상세:`, itemsWithMemo.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo })))
+      
       return updated
     })
   }
