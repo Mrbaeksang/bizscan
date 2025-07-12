@@ -533,7 +533,7 @@ export async function POST(req: NextRequest) {
       openTime: businessInfo.openTime,
       memo: '',
       address: data.사업자주소 || '',
-      businessRegistrationNumber: data.사업자등록번호 || '',
+      businessRegistrationNumber: (data.사업자등록번호 || '').replace(/-/g, ''), // 하이픈 제거
       phoneNumber: businessInfo.phoneNumber,
       isOperational: formatDeliveryStatus(deliveryStatus),
       상호명: data.상호명,
