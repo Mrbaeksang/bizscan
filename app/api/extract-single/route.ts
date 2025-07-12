@@ -480,6 +480,11 @@ function extractRegionFromAddress(address: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now()
+  console.log(`🚀 [BIZSCAN] API 시작: ${new Date().toISOString()}`)
+  console.log(`🔑 [BIZSCAN] API 키 설정됨:`, !!process.env.OPENROUTER_API_KEY)
+  console.log(`⚙️ [BIZSCAN] 환경:`, process.env.NODE_ENV)
+  
   // IP 체크 (선택사항)
   const clientIP = getClientIP(req)
   if (!isAllowedIP(clientIP)) {
@@ -536,13 +541,18 @@ export async function POST(req: NextRequest) {
       사업자등록번호: data.사업자등록번호
     }
     
+    const totalTime = Date.now() - startTime
+    console.log(`✅ [BIZSCAN] API 완료: ${totalTime}ms`)
+    
     return NextResponse.json({
       success: true,
       data: mappedData
     })
     
   } catch (error) {
-    console.error('Error processing single file:', error)
+    const totalTime = Date.now() - startTime
+    console.error(`❌ [BIZSCAN] API 실패 (${totalTime}ms):`, error)
+    
     return NextResponse.json(
       { 
         success: false,
