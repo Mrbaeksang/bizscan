@@ -15,16 +15,58 @@ interface LiveResultsTableProps {
   onMemoChange: (index: number, memo: string) => void
 }
 
+// 중복 제거 함수 (엑셀과 동일한 로직)
+const removeDuplicates = (data: ExcelRowData[]): ExcelRowData[] => {
+  const seen = new Map<string, ExcelRowData>()
+  const uniqueData: ExcelRowData[] = []
+  
+  for (const item of data) {
+    const businessNumber = item.businessRegistrationNumber?.trim()
+    
+    if (businessNumber && businessNumber !== '') {
+      // 사업자등록번호가 있는 경우
+      if (seen.has(businessNumber)) {
+        const existingItem = seen.get(businessNumber)!
+        // 상호명까지 비교하여 완전히 같은 경우만 중복으로 처리
+        if (existingItem.companyAndRepresentative === item.companyAndRepresentative) {
+          console.log(`🔄 [실시간테이블] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
+          continue // 중복이므로 추가하지 않음
+        }
+      }
+      
+      seen.set(businessNumber, item)
+      uniqueData.push(item)
+    } else {
+      // 사업자등록번호가 없는 경우 상호명으로만 비교
+      const companyKey = item.companyAndRepresentative?.trim()
+      if (companyKey && !seen.has(companyKey)) {
+        seen.set(companyKey, item)
+        uniqueData.push(item)
+      } else if (companyKey && seen.has(companyKey)) {
+        console.log(`🔄 [실시간테이블] 중복 제거 (상호명 기준): ${item.companyAndRepresentative}`)
+      } else {
+        // 사업자등록번호도 상호명도 없는 경우 그냥 추가
+        uniqueData.push(item)
+      }
+    }
+  }
+  
+  return uniqueData
+}
+
 export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, failedCount, onMemoChange }: LiveResultsTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20 // 한 페이지당 20개씩
   
-  // 영업 상태별 데이터 분류
+  // 중복 제거 및 영업 상태별 데이터 분류
   const { operationalData, nonOperationalData } = useMemo(() => {
+    // 먼저 중복 제거
+    const uniqueData = removeDuplicates(data)
+    
     const operational: ExcelRowData[] = []
     const nonOperational: ExcelRowData[] = []
     
-    data.forEach(item => {
+    uniqueData.forEach(item => {
       const isOperationalText = String(item.isOperational || '')
       const hasDelivery = isOperationalText.includes('땡겨요(가능)') || 
                          isOperationalText.includes('요기요(가능)') || 
@@ -113,16 +155,16 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                 </thead>
                 <tbody>
                   {paginatedData.map((row, pageIndex) => {
-                    // filteredData에서 현재 아이템의 인덱스
-                    const filteredIndex = startIndex + pageIndex
-                    // 전체 data 배열에서 실제 인덱스 찾기 (고유키 기반)
+                    // 중복 제거로 인해 원본 인덱스 찾기가 복잡해짐
+                    // 사업자번호 + 상호명으로 고유 식별
+                    const uniqueKey = `${row.businessRegistrationNumber || ''}-${row.companyAndRepresentative || ''}`
                     const actualIndex = data.findIndex(item => 
-                      item === filteredData[filteredIndex]
+                      `${item.businessRegistrationNumber || ''}-${item.companyAndRepresentative || ''}` === uniqueKey
                     )
                     
                     // 인덱스를 찾지 못한 경우 스킵
                     if (actualIndex === -1) {
-                      console.error('Could not find matching item for memo update')
+                      console.error('Could not find matching item for memo update:', uniqueKey)
                       return null
                     }
                     // 배달앱 상태 파싱
