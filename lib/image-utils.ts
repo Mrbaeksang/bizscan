@@ -51,6 +51,11 @@ export async function compressImage(
         canvas.toBlob(
           (blob) => {
             if (!blob) {
+              // 에러 시에도 메모리 정리
+              canvas.width = 0;
+              canvas.height = 0;
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              img.src = '';
               reject(new Error('Failed to compress image'));
               return;
             }
@@ -61,6 +66,12 @@ export async function compressImage(
               file.name.replace(/\.[^/.]+$/, `.${format}`),
               { type: `image/${format}` }
             );
+            
+            // 메모리 정리
+            canvas.width = 0;
+            canvas.height = 0;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            img.src = '';
             
             resolve(compressedFile);
           },
