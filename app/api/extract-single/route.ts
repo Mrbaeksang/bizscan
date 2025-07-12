@@ -88,9 +88,9 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
       }
 
       try {
-        // AbortController로 타임아웃 설정 (8초)
+        // AbortController로 타임아웃 설정 (5초로 단축)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 8000)
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -508,14 +508,14 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const data = await extractInfoFromImage(buffer)
     
-    // 배달앱 입점 여부 확인
-    console.log(`📋 [BIZSCAN] 사업자번호로 배달앱 확인 시작: ${data.사업자등록번호}`)
-    const deliveryStatus = await checkDeliveryApps(data.사업자등록번호)
-    console.log(`📋 [BIZSCAN] 배달앱 확인 결과:`, JSON.stringify(deliveryStatus))
+    // 배달앱 확인과 AI 검색을 병렬로 실행 (속도 개선)
+    console.log(`📋 [BIZSCAN] 병렬 처리 시작: 배달앱 확인 + AI 검색`)
+    const [deliveryStatus, businessInfo] = await Promise.all([
+      checkDeliveryApps(data.사업자등록번호),
+      searchBusinessInfo(data.상호명, data.사업자주소)
+    ])
     
-    // AI 웹 검색으로 업체 정보 수집
-    console.log(`📋 [BIZSCAN] AI 웹 검색으로 업체 정보 수집 시작`)
-    const businessInfo = await searchBusinessInfo(data.상호명, data.사업자주소)
+    console.log(`📋 [BIZSCAN] 배달앱 확인 결과:`, JSON.stringify(deliveryStatus))
     console.log(`📋 [BIZSCAN] AI 검색 결과:`, businessInfo)
     
     // 모든 배달앱에 이미 입점된 경우 필터링

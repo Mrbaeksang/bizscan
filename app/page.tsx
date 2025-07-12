@@ -212,7 +212,7 @@ export default function Home() {
     
     const response = await axios.post('/api/extract-single', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 15000 // 15초로 단축
+      timeout: 90000 // 90초로 증가 (배포환경 고려)
     })
     
     if (!response.data.success) {
