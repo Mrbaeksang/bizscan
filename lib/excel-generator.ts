@@ -119,11 +119,8 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
   })
   
   // 모든 셀에 테두리 추가
-  const dataRange = worksheet.getRow(1).getCell(1).address + ':' + 
-                   worksheet.getRow(data.length + 1).getCell(9).address
-  
-  worksheet.eachRow((row, rowNumber) => {
-    row.eachCell((cell, colNumber) => {
+  worksheet.eachRow((row) => {
+    row.eachCell((cell) => {
       cell.border = {
         top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
         left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
@@ -259,7 +256,7 @@ export async function generatePartialExcel(
   // 모든 셀에 테두리 추가
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber >= headerRow) {
-      row.eachCell((cell, colNumber) => {
+      row.eachCell((cell) => {
         cell.border = {
           top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
           left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
