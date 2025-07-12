@@ -296,22 +296,18 @@ export default function Home() {
 
   // 최신 데이터로 엑셀 생성 (상태 최신화 보장)
   const generateLatestExcel = useCallback(() => {
-    // 상태 업데이트 함수를 사용하여 최신 데이터 확보
-    setSuccessData(currentData => {
-      if (!currentData || currentData.length === 0) {
-        alert('생성할 데이터가 없습니다.');
-        return currentData;
-      }
-      
-      console.log('📊 [BIZSCAN] 최신 데이터로 엑셀 생성 시작')
-      console.log('📊 [BIZSCAN] 현재 메모 데이터:', currentData.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
-      
-      // 최신 데이터로 엑셀 생성
-      generateExcel([...currentData]); // 복사본 생성하여 안전성 확보
-      
-      return currentData; // 상태는 그대로 유지
-    });
-  }, [generateExcel])
+    console.log('📊 [BIZSCAN] 최신 데이터로 엑셀 생성 시작')
+    console.log('📊 [BIZSCAN] 현재 successData 길이:', successData.length)
+    console.log('📊 [BIZSCAN] 현재 메모 데이터:', successData.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
+    
+    if (!successData || successData.length === 0) {
+      alert('생성할 데이터가 없습니다.');
+      return;
+    }
+    
+    // 즉시 최신 상태 사용 - React 18에서 더 안정적
+    generateExcel(successData);
+  }, [successData, generateExcel])
 
   // 엑셀 다운로드
   const downloadExcel = () => {

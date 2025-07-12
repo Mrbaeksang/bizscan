@@ -15,10 +15,11 @@ interface LiveResultsTableProps {
   onMemoChange: (index: number, memo: string) => void
 }
 
-// 중복 제거 함수 (엑셀과 동일한 로직)
-const removeDuplicates = (data: ExcelRowData[]): ExcelRowData[] => {
+// 중복 제거 함수 (카운트 포함)
+const removeDuplicatesWithCount = (data: ExcelRowData[]): { uniqueData: ExcelRowData[], duplicatesCount: number } => {
   const seen = new Map<string, ExcelRowData>()
   const uniqueData: ExcelRowData[] = []
+  let duplicatesCount = 0
   
   for (const item of data) {
     const businessNumber = item.businessRegistrationNumber?.trim()
@@ -30,6 +31,7 @@ const removeDuplicates = (data: ExcelRowData[]): ExcelRowData[] => {
         // 상호명까지 비교하여 완전히 같은 경우만 중복으로 처리
         if (existingItem.companyAndRepresentative === item.companyAndRepresentative) {
           console.log(`🔄 [실시간테이블] 중복 제거: ${item.companyAndRepresentative} (${item.businessRegistrationNumber})`)
+          duplicatesCount++
           continue // 중복이므로 추가하지 않음
         }
       }
@@ -44,6 +46,7 @@ const removeDuplicates = (data: ExcelRowData[]): ExcelRowData[] => {
         uniqueData.push(item)
       } else if (companyKey && seen.has(companyKey)) {
         console.log(`🔄 [실시간테이블] 중복 제거 (상호명 기준): ${item.companyAndRepresentative}`)
+        duplicatesCount++
       } else {
         // 사업자등록번호도 상호명도 없는 경우 그냥 추가
         uniqueData.push(item)
@@ -51,7 +54,7 @@ const removeDuplicates = (data: ExcelRowData[]): ExcelRowData[] => {
     }
   }
   
-  return uniqueData
+  return { uniqueData, duplicatesCount }
 }
 
 export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, failedCount, onMemoChange }: LiveResultsTableProps) {
@@ -59,9 +62,9 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
   const itemsPerPage = 20 // 한 페이지당 20개씩
   
   // 중복 제거 및 영업 상태별 데이터 분류
-  const { operationalData, nonOperationalData } = useMemo(() => {
+  const { operationalData, nonOperationalData, duplicateCount } = useMemo(() => {
     // 먼저 중복 제거
-    const uniqueData = removeDuplicates(data)
+    const { uniqueData, duplicatesCount } = removeDuplicatesWithCount(data)
     
     const operational: ExcelRowData[] = []
     const nonOperational: ExcelRowData[] = []
@@ -79,7 +82,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
       }
     })
     
-    return { operationalData: operational, nonOperationalData: nonOperational }
+    return { operationalData: operational, nonOperationalData: nonOperational, duplicateCount: duplicatesCount }
   }, [data])
   
   // 모든 데이터 표시 (영업 가능한 것을 먼저 정렬)
@@ -123,6 +126,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
             <p className="text-sm text-gray-600 mt-1">
               진행률: {Math.round(progress)}% ({data.length}/{totalFiles}개 완료) | 
               영업 가능: {operationalData.length}개, 영업 불가: {nonOperationalData.length}개, 실패: {failedCount}개
+              {duplicateCount > 0 && `, 중복 제거: ${duplicateCount}개`}
               {totalPages > 1 && ` | 페이지 ${currentPage}/${totalPages} (${startIndex + 1}-${endIndex})`}
             </p>
           </div>
