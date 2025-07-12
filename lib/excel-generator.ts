@@ -22,9 +22,10 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
   
   const worksheet = workbook.addWorksheet('사업자등록증 데이터')
 
-  // 열 정의 (메모 칸 맨 뒤로 이동)
+  // 열 정의 (실시간 미리보기와 동일한 순서)
   worksheet.columns = [
     { header: '🏪 상호명', key: 'companyAndRepresentative', width: 35 },
+    { header: '📝 메모', key: 'memo', width: 25 },
     { header: '📞 전화번호', key: 'phoneNumber', width: 18 },
     { header: '🕐 영업시간', key: 'openTime', width: 18 },
     { header: '📍 주소', key: 'address', width: 50 },
@@ -32,7 +33,6 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     { header: '땡겨요', key: 'ddangyo', width: 12 },
     { header: '요기요', key: 'yogiyo', width: 12 },
     { header: '쿠팡이츠', key: 'coupangeats', width: 12 },
-    { header: '📝 메모', key: 'memo', width: 25 },
   ]
 
   // 헤더 스타일링 (더 예쁜 색상)
@@ -75,17 +75,17 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     const isOperationalText = String(row.isOperational || '')
     const deliveryStatus = parseDeliveryStatus(isOperationalText)
     
-    // 한글 문자열을 안전하게 처리 (메모 맨 뒤로 이동)
+    // 한글 문자열을 안전하게 처리 (실시간 미리보기와 동일한 순서)
     const safeRow = {
       companyAndRepresentative: String(row.companyAndRepresentative || ''),
+      memo: String(row.memo || ''),
       phoneNumber: String(row.phoneNumber || ''),
       openTime: String(row.openTime || ''),
       address: String(row.address || ''),
       businessRegistrationNumber: String(row.businessRegistrationNumber || ''),
       ddangyo: deliveryStatus.ddangyo,
       yogiyo: deliveryStatus.yogiyo,
-      coupangeats: deliveryStatus.coupangeats,
-      memo: String(row.memo || '')
+      coupangeats: deliveryStatus.coupangeats
     }
     const addedRow = worksheet.addRow(safeRow)
     
@@ -98,8 +98,8 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
       }
     }
     
-    // 배달앱 컬럼들에 색상 처리 (6, 7, 8열)
-    [6, 7, 8].forEach(colIndex => {
+    // 배달앱 컬럼들에 색상 처리 (7, 8, 9열)
+    [7, 8, 9].forEach(colIndex => {
       const cell = addedRow.getCell(colIndex)
       const cellValue = String(cell.value || '')
       
@@ -122,18 +122,18 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
       cell.alignment = { vertical: 'middle', horizontal: 'center' }
     })
     
-    // 텍스트 정렬 설정
+    // 텍스트 정렬 설정 (새로운 컬럼 순서에 맞게)
     addedRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' } // 상호명
-    addedRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' } // 전화번호
-    addedRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' } // 영업시간
-    addedRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
-    addedRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
-    addedRow.getCell(9).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    addedRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    addedRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' } // 전화번호
+    addedRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' } // 영업시간
+    addedRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
+    addedRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
     
     // 전체 행에 대한 폰트 설정 (크기 12, 볼드)
     addedRow.eachCell((cell, colNumber) => {
-      // 배달앱 컬럼(6,7,8열)이 아닌 경우에만 폰트 설정 적용
-      if (colNumber < 6 || colNumber > 8) {
+      // 배달앱 컬럼(7,8,9열)이 아닌 경우에만 폰트 설정 적용
+      if (colNumber < 7 || colNumber > 9) {
         cell.font = { size: 12, bold: true }
       }
     })
@@ -181,18 +181,18 @@ export async function generatePartialExcel(
   worksheet.addRow(['성공', successCount])
   worksheet.addRow(['실패', failedCount])
 
-  // 열 정의 (가독성 최적화, 메모 맨 뒤로)
+  // 열 정의 (실시간 미리보기와 동일한 순서)
   const headerRow = 5
   worksheet.getRow(headerRow).values = [
     '🏪 상호명',
+    '📝 메모',
     '📞 전화번호', 
     '🕐 영업시간',
     '📍 주소',
     '📄 사업자번호',
     '땡겨요',
     '요기요',
-    '쿠팡이츠',
-    '📝 메모'
+    '쿠팡이츠'
   ]
 
   // 헤더 스타일링 (메인과 동일)
@@ -238,14 +238,14 @@ export async function generatePartialExcel(
     const dataRow = worksheet.getRow(headerRow + index + 1)
     dataRow.values = [
       row.companyAndRepresentative,
+      row.memo,
       row.phoneNumber,
       row.openTime,
       row.address,
       row.businessRegistrationNumber,
       deliveryStatus.ddangyo,
       deliveryStatus.yogiyo,
-      deliveryStatus.coupangeats,
-      row.memo
+      deliveryStatus.coupangeats
     ]
     
     // 행 번갈아 색칠 (zebra striping) - 메인 함수와 일관성 유지
@@ -257,8 +257,8 @@ export async function generatePartialExcel(
       }
     }
     
-    // 배달앱 컬럼들에 색상 처리 (6, 7, 8열)
-    [6, 7, 8].forEach(colIndex => {
+    // 배달앱 컬럼들에 색상 처리 (7, 8, 9열)
+    [7, 8, 9].forEach(colIndex => {
       const cell = dataRow.getCell(colIndex)
       const cellValue = String(cell.value || '')
       
@@ -281,18 +281,18 @@ export async function generatePartialExcel(
       cell.alignment = { vertical: 'middle', horizontal: 'center' }
     })
     
-    // 텍스트 정렬 설정
+    // 텍스트 정렬 설정 (새로운 컬럼 순서에 맞게)
     dataRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' } // 상호명
-    dataRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' } // 전화번호
-    dataRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' } // 영업시간
-    dataRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
-    dataRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
-    dataRow.getCell(9).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    dataRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    dataRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' } // 전화번호
+    dataRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' } // 영업시간
+    dataRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
+    dataRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
     
     // 전체 행에 대한 폰트 설정 (크기 12, 볼드)
     dataRow.eachCell((cell, colNumber) => {
-      // 배달앱 컬럼(6,7,8열)이 아닌 경우에만 폰트 설정 적용
-      if (colNumber < 6 || colNumber > 8) {
+      // 배달앱 컬럼(7,8,9열)이 아닌 경우에만 폰트 설정 적용
+      if (colNumber < 7 || colNumber > 9) {
         cell.font = { size: 12, bold: true }
       }
     })
@@ -315,9 +315,10 @@ export async function generatePartialExcel(
     }
   })
 
-  // 열 너비 설정 (새로운 구조에 맞게)
+  // 열 너비 설정 (실시간 미리보기와 동일한 순서)
   worksheet.columns = [
     { width: 35 }, // 🏪 상호명
+    { width: 25 }, // 📝 메모
     { width: 18 }, // 📞 전화번호
     { width: 18 }, // 🕐 영업시간
     { width: 50 }, // 📍 주소
@@ -325,7 +326,6 @@ export async function generatePartialExcel(
     { width: 12 }, // 땡겨요
     { width: 12 }, // 요기요
     { width: 12 }, // 쿠팡이츠
-    { width: 25 }, // 📝 메모
   ]
 
   // 자동 필터 추가
