@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
@@ -225,12 +225,14 @@ export default function Home() {
     return response.data.data
   }
 
-  // 엑셀 생성
-  const generateExcel = async (data: ExcelRowData[]) => {
+  // 엑셀 생성 함수를 useCallback으로 메모이제이션
+  const generateExcel = useCallback(async (data: ExcelRowData[]) => {
     setIsGenerating(true)
+    setExcelBlob(null) // 기존 엑셀 블롭 초기화하여 새로운 데이터로 생성
     
     try {
       console.log(`🔍 [BIZSCAN] 엑셀 생성 API 호출 시작 - ${data.length}개 데이터`)
+      console.log(`📝 [BIZSCAN] 메모 데이터 상세:`, data.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
       
       const response = await fetch('/api/bulk-review-excel', {
         method: 'POST',
@@ -270,7 +272,14 @@ export default function Home() {
     } finally {
       setIsGenerating(false)
     }
-  }
+  }, []) // 빈 의존성 배열로 함수 안정화
+
+  // 최신 데이터로 엑셀 생성 (상태 최신화 보장)
+  const generateLatestExcel = useCallback(() => {
+    console.log('📊 [BIZSCAN] 최신 데이터로 엑셀 생성 시작')
+    console.log('📊 [BIZSCAN] 버튼 클릭 시점의 메모 데이터:', successData.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
+    generateExcel(successData)
+  }, [successData, generateExcel])
 
   // 엑셀 다운로드
   const downloadExcel = () => {
@@ -296,11 +305,18 @@ export default function Home() {
 
   // 메모 변경 함수
   const handleMemoChange = (index: number, memo: string) => {
+    console.log(`📝 [BIZSCAN] 메모 변경: index=${index}, memo="${memo}"`)
+    
+    // 메모가 변경되면 기존 엑셀 블롭을 무효화하여 재생성 유도
+    setExcelBlob(null)
+    
     setSuccessData(prev => {
       const updated = [...prev]
       if (updated[index]) {
+        console.log(`📝 [BIZSCAN] 기존 메모: "${updated[index].memo}" → 새 메모: "${memo}"`)
         updated[index] = { ...updated[index], memo }
       }
+      console.log(`📝 [BIZSCAN] 업데이트된 데이터:`, updated.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo })))
       return updated
     })
   }
@@ -445,7 +461,10 @@ export default function Home() {
 
             {/* 다운로드 버튼 */}
             {(status === 'paused' || status === 'completed') && successData.length > 0 && (
-              <Button onClick={excelBlob ? downloadExcel : () => generateExcel(successData)} className="flex-1">
+              <Button 
+                onClick={excelBlob ? downloadExcel : generateLatestExcel}
+                className="flex-1"
+              >
                 <Download className="w-4 h-4 mr-2" />
                 {excelBlob ? '엑셀 다운로드' : '엑셀 생성'} ({successData.length}개)
               </Button>

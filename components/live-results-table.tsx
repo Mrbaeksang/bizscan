@@ -72,6 +72,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                 <thead>
                   <tr className="bg-blue-600 text-white">
                     <th className="border border-gray-300 px-3 py-2 text-left font-medium">🏪 상호명</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left font-medium">📝 메모</th>
                     <th className="border border-gray-300 px-3 py-2 text-center font-medium">📞 전화번호</th>
                     <th className="border border-gray-300 px-3 py-2 text-center font-medium">🕐 영업시간</th>
                     <th className="border border-gray-300 px-3 py-2 text-left font-medium">📍 주소</th>
@@ -79,7 +80,6 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                     <th className="border border-gray-300 px-3 py-2 text-center font-medium">땡겨요</th>
                     <th className="border border-gray-300 px-3 py-2 text-center font-medium">요기요</th>
                     <th className="border border-gray-300 px-3 py-2 text-center font-medium">쿠팡이츠</th>
-                    <th className="border border-gray-300 px-3 py-2 text-left font-medium">📝 메모</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -98,6 +98,15 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                     return (
                       <tr key={actualIndex} className={pageIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                         <td className="border border-gray-300 px-3 py-2">{row.companyAndRepresentative}</td>
+                        <td className="border border-gray-300 px-1 py-1">
+                          <input
+                            type="text"
+                            value={row.memo}
+                            onChange={(e) => onMemoChange(actualIndex, e.target.value)}
+                            className="w-full px-2 py-1 border-0 bg-transparent focus:bg-white focus:border focus:border-blue-500 rounded"
+                            placeholder="메모 입력..."
+                          />
+                        </td>
                         <td className="border border-gray-300 px-3 py-2 text-center">{row.phoneNumber}</td>
                         <td className="border border-gray-300 px-3 py-2 text-center">{row.openTime}</td>
                         <td className="border border-gray-300 px-3 py-2">{row.address}</td>
@@ -116,15 +125,6 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                           <span className={`font-bold ${deliveryStatus.coupangeats === '✅' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'} px-2 py-1 rounded text-sm`}>
                             {deliveryStatus.coupangeats}
                           </span>
-                        </td>
-                        <td className="border border-gray-300 px-1 py-1">
-                          <input
-                            type="text"
-                            value={row.memo}
-                            onChange={(e) => onMemoChange(actualIndex, e.target.value)}
-                            className="w-full px-2 py-1 border-0 bg-transparent focus:bg-white focus:border focus:border-blue-500 rounded"
-                            placeholder="메모 입력..."
-                          />
                         </td>
                       </tr>
                     )

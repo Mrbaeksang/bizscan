@@ -22,9 +22,10 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
   
   const worksheet = workbook.addWorksheet('사업자등록증 데이터')
 
-  // 열 정의 (가독성 최적화 순서)
+  // 열 정의 (메모 칸 앞으로 이동)
   worksheet.columns = [
     { header: '🏪 상호명', key: 'companyAndRepresentative', width: 35 },
+    { header: '📝 메모', key: 'memo', width: 25 },
     { header: '📞 전화번호', key: 'phoneNumber', width: 18 },
     { header: '🕐 영업시간', key: 'openTime', width: 18 },
     { header: '📍 주소', key: 'address', width: 50 },
@@ -32,7 +33,6 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     { header: '땡겨요', key: 'ddangyo', width: 12 },
     { header: '요기요', key: 'yogiyo', width: 12 },
     { header: '쿠팡이츠', key: 'coupangeats', width: 12 },
-    { header: '📝 메모', key: 'memo', width: 25 },
   ]
 
   // 헤더 스타일링 (더 예쁜 색상)
@@ -59,17 +59,17 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     const isOperationalText = String(row.isOperational || '')
     const deliveryStatus = parseDeliveryStatus(isOperationalText)
     
-    // 한글 문자열을 안전하게 처리
+    // 한글 문자열을 안전하게 처리 (메모 순서 변경)
     const safeRow = {
       companyAndRepresentative: String(row.companyAndRepresentative || ''),
+      memo: String(row.memo || ''),
       phoneNumber: String(row.phoneNumber || ''),
       openTime: String(row.openTime || ''),
       address: String(row.address || ''),
       businessRegistrationNumber: String(row.businessRegistrationNumber || ''),
       ddangyo: deliveryStatus.ddangyo,
       yogiyo: deliveryStatus.yogiyo,
-      coupangeats: deliveryStatus.coupangeats,
-      memo: String(row.memo || '')
+      coupangeats: deliveryStatus.coupangeats
     }
     const addedRow = worksheet.addRow(safeRow)
     
@@ -113,6 +113,14 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
     addedRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
     addedRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
     addedRow.getCell(9).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    
+    // 전체 행에 대한 폰트 설정 (크기 12, 볼드)
+    addedRow.eachCell((cell, colNumber) => {
+      // 배달앱 컬럼(7,8,9열)이 아닌 경우에만 폰트 설정 적용
+      if (colNumber < 7 || colNumber > 9) {
+        cell.font = { size: 12, bold: true }
+      }
+    })
     
     // 행 높이 설정
     addedRow.height = 20
@@ -248,6 +256,14 @@ export async function generatePartialExcel(
     dataRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
     dataRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
     dataRow.getCell(9).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    
+    // 전체 행에 대한 폰트 설정 (크기 12, 볼드)
+    dataRow.eachCell((cell, colNumber) => {
+      // 배달앱 컬럼(6,7,8열)이 아닌 경우에만 폰트 설정 적용
+      if (colNumber < 6 || colNumber > 8) {
+        cell.font = { size: 12, bold: true }
+      }
+    })
     
     // 행 높이 설정
     dataRow.height = 20
