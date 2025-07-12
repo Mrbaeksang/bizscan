@@ -22,44 +22,121 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
   
   const worksheet = workbook.addWorksheet('사업자등록증 데이터')
 
-  // 열 정의
+  // 열 정의 (가독성 최적화 순서)
   worksheet.columns = [
-    { header: '상호명', key: 'companyAndRepresentative', width: 40 },
-    { header: '오픈시간', key: 'openTime', width: 20 },
-    { header: '메모', key: 'memo', width: 30 },
-    { header: '주소', key: 'address', width: 60 },
-    { header: '사업자번호', key: 'businessRegistrationNumber', width: 25 },
-    { header: '전화번호', key: 'phoneNumber', width: 20 },
-    { header: '영업가능', key: 'isOperational', width: 15 },
+    { header: '🏪 상호명', key: 'companyAndRepresentative', width: 35 },
+    { header: '📞 전화번호', key: 'phoneNumber', width: 18 },
+    { header: '🕐 영업시간', key: 'openTime', width: 18 },
+    { header: '📍 주소', key: 'address', width: 50 },
+    { header: '📄 사업자번호', key: 'businessRegistrationNumber', width: 20 },
+    { header: '땡겨요', key: 'ddangyo', width: 12 },
+    { header: '요기요', key: 'yogiyo', width: 12 },
+    { header: '쿠팡이츠', key: 'coupangeats', width: 12 },
+    { header: '📝 메모', key: 'memo', width: 25 },
   ]
 
-  // 헤더 스타일링
-  worksheet.getRow(1).font = { bold: true }
-  worksheet.getRow(1).fill = {
+  // 헤더 스타일링 (더 예쁜 색상)
+  const headerRow = worksheet.getRow(1)
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+  headerRow.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'FFE0E0E0' }
+    fgColor: { argb: 'FF4472C4' } // 파란색 헤더
+  }
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center' }
+  headerRow.height = 25
+
+  // 영업가능 상태 파싱 함수
+  function parseDeliveryStatus(isOperational: string): {ddangyo: string, yogiyo: string, coupangeats: string} {
+    const ddangyo = isOperational.includes('땡겨요(가능)') ? '✅' : '❌'
+    const yogiyo = isOperational.includes('요기요(가능)') ? '✅' : '❌'
+    const coupangeats = isOperational.includes('쿠팡이츠(가능)') ? '✅' : '❌'
+    return { ddangyo, yogiyo, coupangeats }
   }
 
-  // 데이터 추가 (한글 처리)
-  data.forEach(row => {
+  // 데이터 추가 (가독성 최적화)
+  data.forEach((row, index) => {
+    const isOperationalText = String(row.isOperational || '')
+    const deliveryStatus = parseDeliveryStatus(isOperationalText)
+    
     // 한글 문자열을 안전하게 처리
     const safeRow = {
       companyAndRepresentative: String(row.companyAndRepresentative || ''),
+      phoneNumber: String(row.phoneNumber || ''),
       openTime: String(row.openTime || ''),
-      memo: String(row.memo || ''),
       address: String(row.address || ''),
       businessRegistrationNumber: String(row.businessRegistrationNumber || ''),
-      phoneNumber: String(row.phoneNumber || ''),
-      isOperational: String(row.isOperational || '')
+      ddangyo: deliveryStatus.ddangyo,
+      yogiyo: deliveryStatus.yogiyo,
+      coupangeats: deliveryStatus.coupangeats,
+      memo: String(row.memo || '')
     }
-    worksheet.addRow(safeRow)
+    const addedRow = worksheet.addRow(safeRow)
+    
+    // 행 번갈아 색칠 (zebra striping)
+    if ((index + 2) % 2 === 0) {
+      addedRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF8F9FA' } // 연한 회색
+      }
+    }
+    
+    // 배달앱 컬럼들에 색상 처리 (F, G, H열)
+    [6, 7, 8].forEach(colIndex => {
+      const cell = addedRow.getCell(colIndex)
+      const cellValue = cell.value as string
+      
+      if (cellValue === '✅') {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD4EDDA' } // 연한 초록색
+        }
+        cell.font = { color: { argb: 'FF155724' }, bold: true, size: 12 }
+      } else if (cellValue === '❌') {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF8D7DA' } // 연한 빨간색
+        }
+        cell.font = { color: { argb: 'FF721C24' }, bold: true, size: 12 }
+      }
+      
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+    })
+    
+    // 텍스트 정렬 설정
+    addedRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' } // 상호명
+    addedRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' } // 전화번호
+    addedRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' } // 영업시간
+    addedRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
+    addedRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
+    addedRow.getCell(9).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    
+    // 행 높이 설정
+    addedRow.height = 20
+  })
+  
+  // 모든 셀에 테두리 추가
+  const dataRange = worksheet.getRow(1).getCell(1).address + ':' + 
+                   worksheet.getRow(data.length + 1).getCell(9).address
+  
+  worksheet.eachRow((row, rowNumber) => {
+    row.eachCell((cell, colNumber) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+      }
+    })
   })
 
   // 자동 필터 추가
   worksheet.autoFilter = {
     from: 'A1',
-    to: 'G1'
+    to: 'I1'
   }
 
   // 엑셀 파일을 Buffer로 변환 (한글 지원)
@@ -83,49 +160,136 @@ export async function generatePartialExcel(
   worksheet.addRow(['성공', successCount])
   worksheet.addRow(['실패', failedCount])
 
-  // 열 정의
+  // 열 정의 (가독성 최적화)
   const headerRow = 5
   worksheet.getRow(headerRow).values = [
-    '상호명(대표자명)',
-    '오픈시간',
-    '메모',
-    '주소',
-    '사업자번호',
-    '전화번호',
-    '영업가능'
+    '🏪 상호명',
+    '📞 전화번호', 
+    '🕐 영업시간',
+    '📍 주소',
+    '📄 사업자번호',
+    '땡겨요',
+    '요기요',
+    '쿠팡이츠',
+    '📝 메모'
   ]
 
-  // 헤더 스타일링
-  worksheet.getRow(headerRow).font = { bold: true }
-  worksheet.getRow(headerRow).fill = {
+  // 헤더 스타일링 (메인과 동일)
+  const headerRowObj = worksheet.getRow(headerRow)
+  headerRowObj.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+  headerRowObj.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'FFE0E0E0' }
+    fgColor: { argb: 'FF4472C4' } // 파란색 헤더
+  }
+  headerRowObj.alignment = { vertical: 'middle', horizontal: 'center' }
+  headerRowObj.height = 25
+
+  // 영업가능 상태 파싱 함수 (동일)
+  function parseDeliveryStatus(isOperational: string): {ddangyo: string, yogiyo: string, coupangeats: string} {
+    const ddangyo = isOperational.includes('땡겨요(가능)') ? '✅' : '❌'
+    const yogiyo = isOperational.includes('요기요(가능)') ? '✅' : '❌'
+    const coupangeats = isOperational.includes('쿠팡이츠(가능)') ? '✅' : '❌'
+    return { ddangyo, yogiyo, coupangeats }
   }
 
-  // 데이터 추가
+  // 데이터 추가 (메인과 동일한 스타일)
   data.forEach((row, index) => {
-    worksheet.getRow(headerRow + index + 1).values = [
+    const isOperationalText = String(row.isOperational || '')
+    const deliveryStatus = parseDeliveryStatus(isOperationalText)
+    
+    const dataRow = worksheet.getRow(headerRow + index + 1)
+    dataRow.values = [
       row.companyAndRepresentative,
+      row.phoneNumber,
       row.openTime,
-      row.memo,
       row.address,
       row.businessRegistrationNumber,
-      row.phoneNumber,
-      row.isOperational
+      deliveryStatus.ddangyo,
+      deliveryStatus.yogiyo,
+      deliveryStatus.coupangeats,
+      row.memo
     ]
+    
+    // 행 번갈아 색칠 (zebra striping) - 메인 함수와 일관성 유지
+    if ((index + headerRow + 1) % 2 === 0) {
+      dataRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF8F9FA' } // 연한 회색
+      }
+    }
+    
+    // 배달앱 컬럼들에 색상 처리 (F, G, H열)
+    [6, 7, 8].forEach(colIndex => {
+      const cell = dataRow.getCell(colIndex)
+      const cellValue = cell.value as string
+      
+      if (cellValue === '✅') {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD4EDDA' } // 연한 초록색
+        }
+        cell.font = { color: { argb: 'FF155724' }, bold: true, size: 12 }
+      } else if (cellValue === '❌') {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF8D7DA' } // 연한 빨간색
+        }
+        cell.font = { color: { argb: 'FF721C24' }, bold: true, size: 12 }
+      }
+      
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+    })
+    
+    // 텍스트 정렬 설정
+    dataRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' } // 상호명
+    dataRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' } // 전화번호
+    dataRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' } // 영업시간
+    dataRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' } // 주소
+    dataRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' } // 사업자번호
+    dataRow.getCell(9).alignment = { vertical: 'middle', horizontal: 'left' } // 메모
+    
+    // 행 높이 설정
+    dataRow.height = 20
+  })
+  
+  // 모든 셀에 테두리 추가
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber >= headerRow) {
+      row.eachCell((cell, colNumber) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+        }
+      })
+    }
   })
 
-  // 열 너비 설정
+  // 열 너비 설정 (새로운 구조에 맞게)
   worksheet.columns = [
-    { width: 40 }, // 상호명(대표자명)
-    { width: 20 }, // 오픈시간
-    { width: 30 }, // 메모
-    { width: 60 }, // 주소
-    { width: 25 }, // 사업자번호
-    { width: 20 }, // 전화번호
-    { width: 15 }, // 영업가능
+    { width: 35 }, // 🏪 상호명
+    { width: 18 }, // 📞 전화번호
+    { width: 18 }, // 🕐 영업시간
+    { width: 50 }, // 📍 주소
+    { width: 20 }, // 📄 사업자번호
+    { width: 12 }, // 땡겨요
+    { width: 12 }, // 요기요
+    { width: 12 }, // 쿠팡이츠
+    { width: 25 }, // 📝 메모
   ]
+
+  // 자동 필터 추가
+  if (data.length > 0) {
+    worksheet.autoFilter = {
+      from: `A${headerRow}`,
+      to: `I${headerRow}`
+    }
+  }
 
   const buffer = await workbook.xlsx.writeBuffer()
   return new Blob([buffer], {
