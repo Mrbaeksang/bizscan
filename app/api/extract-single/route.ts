@@ -202,8 +202,9 @@ async function checkYogiyo(bizRegNo: string): Promise<'registered' | 'available'
     const data = await response.json()
     console.log(`🍕 [YOGIYO] ${bizRegNo} 응답:`, JSON.stringify(data))
     
-    if (data.message?.includes('이미 등록된')) {
-      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 이미 입점 (${data.message})`)
+    if (data.message?.includes('이미 등록된') || 
+        data.context?.company_number?.[0]?.includes('이미 등록된')) {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 이미 입점 (${data.message || data.context?.company_number?.[0]})`)
       return 'registered' // 이미 입점
     } else if (data.message?.includes('입점신청 가능')) {
       console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 입점 가능 (${data.message})`)
