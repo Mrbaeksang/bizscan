@@ -125,8 +125,8 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
             <h2 className="text-xl font-semibold">실시간 처리 결과</h2>
             <p className="text-sm text-gray-600 mt-1">
               진행률: {Math.round(progress)}% ({data.length}/{totalFiles}개 완료) | 
-              영업 가능: {operationalData.length}개, 영업 불가: {nonOperationalData.length}개, 실패: {failedCount}개
-              {duplicateCount > 0 && `, 중복 제거: ${duplicateCount}개`}
+              표시: 영업가능 {operationalData.length}개 + 영업불가 {nonOperationalData.length}개 = {operationalData.length + nonOperationalData.length}개
+              {duplicateCount > 0 && ` (중복 ${duplicateCount}개 제거됨)`} | 실패: {failedCount}개
               {totalPages > 1 && ` | 페이지 ${currentPage}/${totalPages} (${startIndex + 1}-${endIndex})`}
             </p>
           </div>
@@ -187,10 +187,19 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                         <td className="border border-gray-300 px-1 py-1">
                           <input
                             type="text"
-                            value={row.memo}
+                            value={row.memo || ''}
                             onChange={(e) => onMemoChange(actualIndex, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.target.blur(); // 엔터 시 포커스 해제로 저장 확실히
+                                console.log('🔥 [메모저장] 엔터키로 저장:', e.target.value);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              console.log('🔥 [메모저장] 포커스 아웃으로 저장:', e.target.value);
+                            }}
                             className="w-full px-2 py-1 border-0 bg-transparent focus:bg-white focus:border focus:border-blue-500 rounded"
-                            placeholder="메모 입력..."
+                            placeholder="메모 입력 후 엔터..."
                           />
                         </td>
                         <td className="border border-gray-300 px-3 py-2 text-left font-bold">{row.phoneNumber}</td>
@@ -226,7 +235,7 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <p className="text-sm text-gray-600">
-                💡 메모를 입력하면 자동 저장됩니다. 최종 엑셀에 포함됩니다.
+                💡 메모 입력 후 <strong>엔터키</strong> 또는 <strong>다른 곳 클릭</strong>하면 저장됩니다.
               </p>
             </div>
             
