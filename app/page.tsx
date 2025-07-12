@@ -5,6 +5,7 @@ import axios from 'axios'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
 import { ReviewResultsModal } from '@/components/review-results-modal'
+import { LiveResultsTable } from '@/components/live-results-table'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, RefreshCw, Trash2 } from 'lucide-react'
@@ -33,6 +34,7 @@ export default function Home() {
   // UI 상태
   const [showFailedModal, setShowFailedModal] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [showLivePreview, setShowLivePreview] = useState(false)
   const [reviewResults, setReviewResults] = useState<{
     originalCount: number
     afterDeduplication: number
@@ -121,6 +123,7 @@ export default function Home() {
     setStatus('processing')
     cancelRef.current = false
     currentIndexRef.current = 0
+    setShowLivePreview(true) // 실시간 테이블 열기
     
     console.log(`🚀 [BIZSCAN] 처리 시작 - 총 ${files.length}개 파일`)
     
@@ -448,6 +451,17 @@ export default function Home() {
               </Button>
             )}
 
+            {/* 실시간 테이블 버튼 */}
+            {(status === 'processing' || successData.length > 0) && (
+              <Button 
+                onClick={() => setShowLivePreview(true)} 
+                variant="outline"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                실시간 결과 ({successData.length}개)
+              </Button>
+            )}
+
             {/* 실패 파일 버튼 */}
             {failedFiles.length > 0 && (
               <Button 
@@ -508,6 +522,14 @@ export default function Home() {
         open={showReviewModal}
         onClose={() => setShowReviewModal(false)}
         reviewResults={reviewResults}
+      />
+
+      <LiveResultsTable 
+        isOpen={showLivePreview}
+        onClose={() => setShowLivePreview(false)}
+        data={successData}
+        progress={progress}
+        totalFiles={files.length}
       />
     </div>
   )
