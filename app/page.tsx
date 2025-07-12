@@ -45,21 +45,22 @@ export default function Home() {
   const cancelRef = useRef(false)
   const currentIndexRef = useRef(0)
 
-  // 인증 확인
+  // 인증 확인 (임시 해제)
   useEffect(() => {
-    const token = clientStorage.getAuthToken()
-    if (token) {
-      try {
-        const tokenData = JSON.parse(atob(token))
-        if (new Date(tokenData.expiresAt) > new Date()) {
-          setAuthStep('authenticated')
-        } else {
-          clientStorage.clearAuthToken()
-        }
-      } catch {
-        clientStorage.clearAuthToken()
-      }
-    }
+    setAuthStep('authenticated')
+    // const token = clientStorage.getAuthToken()
+    // if (token) {
+    //   try {
+    //     const tokenData = JSON.parse(atob(token))
+    //     if (new Date(tokenData.expiresAt) > new Date()) {
+    //       setAuthStep('authenticated')
+    //     } else {
+    //       clientStorage.clearAuthToken()
+    //     }
+    //   } catch {
+    //     clientStorage.clearAuthToken()
+    //   }
+    // }
   }, [])
 
   // 인증 처리
