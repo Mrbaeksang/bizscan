@@ -308,7 +308,7 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
     
     if (!primaryApiKey) {
       console.log(`🔍 [AI SEARCH] OpenRouter API 키가 설정되지 않음`)
-      return { phoneNumber: '', openTime: '' }
+      return { phoneNumber: '미확인', openTime: '미확인' }
     }
 
     // 지역명 추출하여 검색 프롬프트 구성
@@ -319,14 +319,27 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
 주소: ${address}
 지역: ${region}
 
-인터넷에서 이 업체를 검색해서 다음 정보를 JSON 형식으로 제공해주세요:
-- phoneNumber: 전화번호 (없으면 빈 문자열)
-- openTime: 영업시간 (없으면 빈 문자열)
+중요한 규칙:
+1. 반드시 정확한 정보만 제공하세요
+2. 검색 결과에서 해당 업체와 정확히 일치하는 정보만 사용하세요
+3. 불확실하거나 다른 업체의 정보일 가능성이 있으면 "미확인"으로 응답하세요
+4. 전화번호는 반드시 해당 업체의 것이어야 합니다
+5. 영업시간도 반드시 해당 업체의 것이어야 합니다
+
+다음 정보를 JSON 형식으로 제공해주세요:
+- phoneNumber: 전화번호 (확실하지 않으면 "미확인")
+- openTime: 영업시간 (확실하지 않으면 "미확인")
 
 응답 예시:
 {
   "phoneNumber": "031-123-4567",
   "openTime": "09:00-22:00"
+}
+
+또는 불확실한 경우:
+{
+  "phoneNumber": "미확인",
+  "openTime": "미확인"
 }
 
 반드시 JSON 형식으로만 응답하고, 다른 설명은 포함하지 마세요.`
@@ -340,7 +353,8 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
           role: 'user',
           content: searchPrompt
         }
-      ]
+      ],
+      temperature: 0.1 // 더 일관성 있는 응답을 위해 낮은 temperature
     }
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -357,14 +371,14 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
     if (!response.ok) {
       const errorData = await response.text()
       console.log(`🔍 [AI SEARCH] API 요청 실패: ${response.status} - ${errorData}`)
-      return { phoneNumber: '', openTime: '' }
+      return { phoneNumber: '미확인', openTime: '미확인' }
     }
 
     const data = await response.json()
     
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.log(`🔍 [AI SEARCH] 잘못된 API 응답 구조`)
-      return { phoneNumber: '', openTime: '' }
+      return { phoneNumber: '미확인', openTime: '미확인' }
     }
     
     const content = data.choices[0].message.content
@@ -384,14 +398,32 @@ async function searchBusinessInfo(companyName: string, address: string): Promise
     const businessInfo = JSON.parse(cleanContent)
     console.log('🔍 [AI SEARCH] 파싱된 정보:', businessInfo)
 
+    // 응답 검증 및 정리
+    const phoneNumber = String(businessInfo.phoneNumber || '').trim()
+    const openTime = String(businessInfo.openTime || '').trim()
+    
+    // 빈 문자열은 "미확인"으로 변경
+    const finalPhoneNumber = phoneNumber === '' ? '미확인' : phoneNumber
+    const finalOpenTime = openTime === '' ? '미확인' : openTime
+    
+    // 전화번호 형식 간단 검증 (한국 전화번호 패턴이 아니면 미확인)
+    const phonePattern = /^(0\d{1,2}-?\d{3,4}-?\d{4}|1\d{3}-?\d{4}|050\d-?\d{4}-?\d{4})$/
+    const isValidPhone = finalPhoneNumber === '미확인' || phonePattern.test(finalPhoneNumber.replace(/[^0-9-]/g, ''))
+    
+    console.log('🔍 [AI SEARCH] 검증 결과:', {
+      phoneNumber: finalPhoneNumber,
+      openTime: finalOpenTime,
+      phoneValid: isValidPhone
+    })
+
     return {
-      phoneNumber: businessInfo.phoneNumber || '',
-      openTime: businessInfo.openTime || ''
+      phoneNumber: isValidPhone ? finalPhoneNumber : '미확인',
+      openTime: finalOpenTime
     }
     
   } catch (error) {
     console.log(`🔍 [AI SEARCH] 검색 에러:`, error)
-    return { phoneNumber: '', openTime: '' }
+    return { phoneNumber: '미확인', openTime: '미확인' }
   }
 }
 
