@@ -18,9 +18,8 @@ export async function POST(request: NextRequest) {
     console.log(`📋 [BIZSCAN] 원본 데이터 샘플:`, JSON.stringify(rawData[0], null, 2))
     console.log(`📋 [BIZSCAN] 모든 데이터:`, JSON.stringify(rawData, null, 2))
 
-    // 배달앱 필터링 후 중복 제거 및 엑셀 생성
-    const filteredData = filterDeliveryData(rawData)
-    const { uniqueData, duplicatesRemoved } = removeDuplicates(filteredData)
+    // 중복 제거 및 엑셀 생성 (모든 데이터 포함)
+    const { uniqueData, duplicatesRemoved } = removeDuplicates(rawData)
     console.log(`🔄 [BIZSCAN] 중복 제거 완료 - ${uniqueData.length}개 남음`)
     
     console.log(`📊 [BIZSCAN] 엑셀 생성 함수 호출 중...`)
