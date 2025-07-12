@@ -189,11 +189,6 @@ export default function Home() {
       // 진행률 업데이트
       const progressPercent = Math.round(((i + 1) / files.length) * 100)
       setProgress(progressPercent)
-      
-      // 3초 대기
-      if (i < files.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 3000))
-      }
     }
     
     // 처리 완료

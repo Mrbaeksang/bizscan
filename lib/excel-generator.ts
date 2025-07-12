@@ -24,7 +24,7 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
 
   // 열 정의
   worksheet.columns = [
-    { header: '상호명(대표자명)', key: 'companyAndRepresentative', width: 40 },
+    { header: '상호명', key: 'companyAndRepresentative', width: 40 },
     { header: '오픈시간', key: 'openTime', width: 20 },
     { header: '메모', key: 'memo', width: 30 },
     { header: '주소', key: 'address', width: 60 },

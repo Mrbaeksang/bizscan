@@ -5,11 +5,10 @@ import { getClientIP, isAllowedIP } from '@/lib/ip-check'
 const SYSTEM_PROMPT = `당신은 대한민국 사업자등록증 이미지 분석 전문가입니다.
 
 당신의 임무:
-사업자등록증 이미지에서 정확히 다음 4가지 정보만 추출하세요:
-1. "대표자명" - 대표자 성명
-2. "상호명" - 사업체 이름
-3. "사업자주소" - 사업장 소재지 전체 주소
-4. "사업자등록번호" - 10자리 사업자번호
+사업자등록증 이미지에서 정확히 다음 3가지 정보만 추출하세요:
+1. "상호명" - 사업체 이름
+2. "사업자주소" - 사업장 소재지 전체 주소
+3. "사업자등록번호" - 10자리 사업자번호
 
 중요 규칙:
 - 반드시 JSON 형식으로만 응답하세요
@@ -20,14 +19,12 @@ const SYSTEM_PROMPT = `당신은 대한민국 사업자등록증 이미지 분�
 
 응답 예시:
 {
-  "대표자명": "홍길동",
   "상호명": "주식회사 샘플",
   "사업자주소": "서울특별시 강남구 테헤란로 123 샘플빌딩 5층",
   "사업자등록번호": "123-45-67890"
 }`
 
 interface ExtractedData {
-  대표자명: string
   상호명: string
   사업자주소: string
   사업자등록번호: string
@@ -167,14 +164,13 @@ export async function POST(req: NextRequest) {
     
     // 성공한 데이터 변환
     const mappedData = {
-      companyAndRepresentative: `${data.상호명 || ''}(${data.대표자명 || ''})`,
+      companyAndRepresentative: data.상호명 || '',
       openTime: '',
       memo: '',
       address: data.사업자주소 || '',
       businessRegistrationNumber: data.사업자등록번호 || '',
       phoneNumber: '',
       isOperational: '',
-      대표자명: data.대표자명,
       상호명: data.상호명,
       사업자주소: data.사업자주소,
       사업자등록번호: data.사업자등록번호
