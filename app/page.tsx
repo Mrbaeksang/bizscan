@@ -16,6 +16,11 @@ import type { ExcelRowData } from '@/lib/excel-generator'
 type Status = 'idle' | 'processing' | 'paused' | 'completed'
 type AuthStep = 'request' | 'verify' | 'authenticated'
 
+// 재시도 카운트가 포함된 파일 타입
+interface FileWithRetry extends File {
+  retryCount?: number
+}
+
 export default function Home() {
   // 인증 관련
   const [authStep, setAuthStep] = useState<AuthStep>('request')
@@ -24,7 +29,7 @@ export default function Home() {
   const [authMessage, setAuthMessage] = useState('')
   
   // 핵심 상태 6개
-  const [files, setFiles] = useState<File[]>([])
+  const [files, setFiles] = useState<FileWithRetry[]>([])
   const [status, setStatus] = useState<Status>('idle')
   const [successData, setSuccessData] = useState<ExcelRowData[]>([])
   const [failedFiles, setFailedFiles] = useState<{name: string, error: string}[]>([])
@@ -192,10 +197,10 @@ export default function Home() {
         console.log(`❌ [BIZSCAN] 실패: ${file.name} - ${errorMsg}`)
         
         // 실패한 파일을 맨 뒤로 이동 (최대 3번까지만 재시도)
-        const retryCount = (file as any).retryCount || 0
+        const retryCount = file.retryCount || 0
         if (retryCount < 3) {
           console.log(`🔄 [BIZSCAN] 재시도 ${retryCount + 1}/3: ${file.name}`)
-          const retryFile = { ...file, retryCount: retryCount + 1 } as any
+          const retryFile: FileWithRetry = Object.assign(file, { retryCount: retryCount + 1 })
           setFiles(prev => [...prev, retryFile]) // 맨 뒤에 추가
         } else {
           console.log(`💀 [BIZSCAN] 최종 실패: ${file.name}`)
