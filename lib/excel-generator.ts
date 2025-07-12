@@ -98,10 +98,10 @@ export async function generateExcelFromData(data: ExcelRowData[]): Promise<Buffe
       }
     }
     
-    // 배달앱 컬럼들에 색상 처리 (F, G, H열)
+    // 배달앱 컬럼들에 색상 처리 (6, 7, 8열)
     [6, 7, 8].forEach(colIndex => {
       const cell = addedRow.getCell(colIndex)
-      const cellValue = cell.value as string
+      const cellValue = String(cell.value || '')
       
       if (cellValue === '✅') {
         cell.fill = {
@@ -257,10 +257,10 @@ export async function generatePartialExcel(
       }
     }
     
-    // 배달앱 컬럼들에 색상 처리 (F, G, H열)
+    // 배달앱 컬럼들에 색상 처리 (6, 7, 8열)
     [6, 7, 8].forEach(colIndex => {
       const cell = dataRow.getCell(colIndex)
-      const cellValue = cell.value as string
+      const cellValue = String(cell.value || '')
       
       if (cellValue === '✅') {
         cell.fill = {
