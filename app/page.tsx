@@ -179,7 +179,7 @@ export default function Home() {
         const processedData = await processFile(file)
         
         results.push(processedData)
-        setSuccessData([...results])
+        setSuccessData(prev => [...prev, processedData])
         
         console.log(`✅ [BIZSCAN] 성공: ${file.name}`)
       } catch (error) {
