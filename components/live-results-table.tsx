@@ -119,6 +119,12 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                     const actualIndex = data.findIndex(item => 
                       item === filteredData[filteredIndex]
                     )
+                    
+                    // 인덱스를 찾지 못한 경우 스킵
+                    if (actualIndex === -1) {
+                      console.error('Could not find matching item for memo update')
+                      return null
+                    }
                     // 배달앱 상태 파싱
                     const parseDeliveryStatus = (isOperational: string) => {
                       const ddangyo = isOperational.includes('땡겨요(가능)') ? '✅' : '❌'
