@@ -138,6 +138,167 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
   throw lastError || new Error('All API keys and models failed')
 }
 
+// 배달앱 입점 여부 확인 타입
+interface DeliveryStatus {
+  ddangyo: 'registered' | 'available' | 'unknown'
+  yogiyo: 'registered' | 'available' | 'unknown'
+  coupangeats: 'registered' | 'available' | 'unknown'
+}
+
+// 땡겨요 입점 확인
+async function checkDdangyo(bizRegNo: string): Promise<'registered' | 'available' | 'unknown'> {
+  try {
+    const response = await fetch('https://boss.ddangyo.com/o2o/shop/cm/requestIsBizRegNoTemp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+        'Origin': 'https://boss.ddangyo.com',
+        'Referer': 'https://boss.ddangyo.com/join',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        dma_onlineApply04: {
+          biz_reg_no: bizRegNo.replace(/-/g, ''),
+          sotid: "0000"
+        }
+      })
+    })
+    
+    const data = await response.json()
+    console.log(`🚚 [DDANGYO] ${bizRegNo} 응답:`, JSON.stringify(data))
+    
+    // 실제 응답 구조에 맞춰 수정
+    if (data.dma_result?.result === "1000") {
+      console.log(`🚚 [DDANGYO] ${bizRegNo} 판정: 이미 입점 (result: ${data.dma_result.result})`)
+      return 'registered' // 이미 입점 (result: "1000")
+    } else if (data.dma_error?.resultCode === "000") {
+      console.log(`🚚 [DDANGYO] ${bizRegNo} 판정: 입점 가능 (error.resultCode: ${data.dma_error.resultCode})`)
+      return 'available' // 입점 가능 (error의 resultCode가 "000")
+    } else {
+      console.log(`🚚 [DDANGYO] ${bizRegNo} 판정: 알 수 없음 - dma_result:`, data.dma_result, 'dma_error:', data.dma_error)
+      return 'unknown'
+    }
+  } catch (error) {
+    console.log(`🚚 [DDANGYO] ${bizRegNo} 에러:`, error)
+    return 'unknown'
+  }
+}
+
+// 요기요 입점 확인
+async function checkYogiyo(bizRegNo: string): Promise<'registered' | 'available' | 'unknown'> {
+  try {
+    const cleanBizNo = bizRegNo.replace(/-/g, '')
+    const response = await fetch(`https://ceo-api.yogiyo.co.kr/join/validate-company-number/?company_number=${cleanBizNo}`, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Origin': 'https://ceo.yogiyo.co.kr',
+        'Referer': 'https://ceo.yogiyo.co.kr/'
+      }
+    })
+    
+    const data = await response.json()
+    console.log(`🍕 [YOGIYO] ${bizRegNo} 응답:`, JSON.stringify(data))
+    
+    if (data.message?.includes('이미 등록된')) {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 이미 입점 (${data.message})`)
+      return 'registered' // 이미 입점
+    } else if (data.message?.includes('입점신청 가능')) {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 입점 가능 (${data.message})`)
+      return 'available' // 입점 가능
+    } else {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 알 수 없음 (${data.message})`)
+      return 'unknown'
+    }
+  } catch (error) {
+    console.log(`🍕 [YOGIYO] ${bizRegNo} 에러:`, error)
+    return 'unknown'
+  }
+}
+
+// 쿠팡이츠 입점 확인
+async function checkCoupangEats(bizRegNo: string): Promise<'registered' | 'available' | 'unknown'> {
+  try {
+    const cleanBizNo = bizRegNo.replace(/-/g, '')
+    const response = await fetch(`https://store.coupangeats.com/api/v1/merchant/web/businessregistration/verify?bizNo=${cleanBizNo}`, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    })
+    
+    const data = await response.json()
+    console.log(`🥘 [COUPANG] ${bizRegNo} 응답:`, JSON.stringify(data))
+    
+    // 실제 응답 구조에 맞춰 수정
+    if (data.error?.message?.includes('이미 등록된 사업자등록번호')) {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 이미 입점 (${data.error.message})`)
+      return 'registered' // 이미 입점
+    } else if (data.error?.message?.includes('유효하지 않습니다')) {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 알 수 없음 (${data.error.message})`)
+      return 'unknown' // 유효하지 않은 사업자번호
+    } else if (data.data === true && data.code === "SUCCESS") {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 입점 가능 (data: true, code: SUCCESS)`)
+      return 'available' // 입점 가능
+    } else if (data.data === null && !data.error) {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 입점 가능 (data: null, no error)`)
+      return 'available' // 입점 가능
+    } else {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 알 수 없음 - data:`, data.data, 'error:', data.error, 'code:', data.code)
+      return 'unknown'
+    }
+  } catch (error) {
+    console.log(`🥘 [COUPANG] ${bizRegNo} 에러:`, error)
+    return 'unknown'
+  }
+}
+
+// 배달앱 입점 여부 종합 확인
+async function checkDeliveryApps(bizRegNo: string): Promise<DeliveryStatus> {
+  if (!bizRegNo || bizRegNo.trim() === '') {
+    return {
+      ddangyo: 'unknown',
+      yogiyo: 'unknown',
+      coupangeats: 'unknown'
+    }
+  }
+  
+  console.log(`🔍 [DELIVERY] ${bizRegNo} 배달앱 입점 확인 시작`)
+  
+  const [ddangyo, yogiyo, coupangeats] = await Promise.all([
+    checkDdangyo(bizRegNo),
+    checkYogiyo(bizRegNo),
+    checkCoupangEats(bizRegNo)
+  ])
+  
+  return { ddangyo, yogiyo, coupangeats }
+}
+
+// 모든 배달앱에 입점되어 있는지 확인
+function isAllRegistered(status: DeliveryStatus): boolean {
+  return status.ddangyo === 'registered' && 
+         status.yogiyo === 'registered' && 
+         status.coupangeats === 'registered'
+}
+
+// 배달앱 상태를 문자열로 포맷팅 (엄격한 기준: 확실한 가능만 가능, 나머지는 모두 불가)
+function formatDeliveryStatus(status: DeliveryStatus): string {
+  const formatStatus = (platform: string, state: string) => {
+    switch (state) {
+      case 'available': return `${platform}(가능)` // 100% 확실한 입점 가능만
+      default: return `${platform}(불가)` // registered, unknown 등 모든 경우
+    }
+  }
+  
+  return [
+    formatStatus('땡겨요', status.ddangyo),
+    formatStatus('요기요', status.yogiyo),
+    formatStatus('쿠팡이츠', status.coupangeats)
+  ].join(' / ')
+}
+
 export async function POST(req: NextRequest) {
   // IP 체크 (선택사항)
   const clientIP = getClientIP(req)
@@ -162,6 +323,20 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const data = await extractInfoFromImage(buffer)
     
+    // 배달앱 입점 여부 확인
+    console.log(`📋 [BIZSCAN] 사업자번호로 배달앱 확인 시작: ${data.사업자등록번호}`)
+    const deliveryStatus = await checkDeliveryApps(data.사업자등록번호)
+    console.log(`📋 [BIZSCAN] 배달앱 확인 결과:`, JSON.stringify(deliveryStatus))
+    
+    // 모든 배달앱에 이미 입점된 경우 필터링
+    if (isAllRegistered(deliveryStatus)) {
+      console.log(`📋 [BIZSCAN] 모든 배달앱 입점으로 필터링됨: ${data.사업자등록번호}`)
+      return NextResponse.json({
+        success: false,
+        error: '모든 배달앱에 이미 입점된 업체입니다.'
+      })
+    }
+    
     // 성공한 데이터 변환
     const mappedData = {
       companyAndRepresentative: data.상호명 || '',
@@ -170,7 +345,7 @@ export async function POST(req: NextRequest) {
       address: data.사업자주소 || '',
       businessRegistrationNumber: data.사업자등록번호 || '',
       phoneNumber: '',
-      isOperational: '',
+      isOperational: formatDeliveryStatus(deliveryStatus),
       상호명: data.상호명,
       사업자주소: data.사업자주소,
       사업자등록번호: data.사업자등록번호
