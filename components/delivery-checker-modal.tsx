@@ -24,14 +24,10 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
   const [result, setResult] = useState<DeliveryStatus | null>(null)
   const [error, setError] = useState('')
 
-  // 사업자번호 포맷팅 (XXX-XX-XXXXX)
+  // 사업자번호 포맷팅 (숫자만)
   const formatBusinessNumber = (value: string) => {
     const numbers = value.replace(/[^\d]/g, '')
-    const limited = numbers.slice(0, 10)
-    
-    if (limited.length <= 3) return limited
-    if (limited.length <= 5) return `${limited.slice(0, 3)}-${limited.slice(3)}`
-    return `${limited.slice(0, 3)}-${limited.slice(3, 5)}-${limited.slice(5)}`
+    return numbers.slice(0, 10)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,12 +121,13 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
         <div className="space-y-4 mt-4">
           <div className="flex gap-2">
             <Input
-              placeholder="사업자번호 입력 (예: 123-45-67890)"
+              placeholder="사업자번호 10자리 입력"
               value={businessNumber}
               onChange={handleInputChange}
               onKeyPress={(e) => e.key === 'Enter' && checkDeliveryStatus()}
               disabled={loading}
               className="flex-1"
+              maxLength={10}
             />
             <Button 
               onClick={checkDeliveryStatus}
