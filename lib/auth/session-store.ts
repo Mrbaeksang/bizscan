@@ -61,7 +61,8 @@ class SessionStore {
 
   private cleanup() {
     const now = new Date()
-    for (const [id, session] of this.sessions.entries()) {
+    const entries = Array.from(this.sessions.entries())
+    for (const [id, session] of entries) {
       if (now > session.expiresAt) {
         this.sessions.delete(id)
       }
