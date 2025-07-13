@@ -125,14 +125,64 @@ export default function Home() {
       return
     }
     
-    setStatus('processing')
-    cancelRef.current = false
-    currentIndexRef.current = 0
-    setShowLivePreview(true) // 실시간 테이블 열기
-    
-    console.log(`🚀 [BIZSCAN] 처리 시작 - 총 ${files.length}개 파일`)
-    
-    await processFiles()
+    try {
+      // Discord 승인 요청
+      console.log('🔐 [BIZSCAN] Discord 승인 요청 중...')
+      const approvalResponse = await fetch('/api/analysis/request-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileCount: files.length })
+      })
+      
+      if (!approvalResponse.ok) {
+        alert('승인 요청 중 오류가 발생했습니다.')
+        return
+      }
+      
+      const approvalData = await approvalResponse.json()
+      const sessionId = approvalData.sessionId
+      
+      // 승인 대기 (최대 5분)
+      alert('관리자에게 승인 요청을 보냈습니다. Discord를 확인해주세요.')
+      
+      let approved = false
+      const maxAttempts = 60 // 5초마다 체크, 총 5분
+      
+      for (let i = 0; i < maxAttempts; i++) {
+        const checkResponse = await fetch(`/api/analysis/check-approval?sid=${sessionId}`)
+        const checkData = await checkResponse.json()
+        
+        if (checkData.status === 'approved') {
+          approved = true
+          break
+        } else if (checkData.status === 'denied') {
+          alert('관리자가 요청을 거부했습니다.')
+          return
+        }
+        
+        // 5초 대기
+        await new Promise(resolve => setTimeout(resolve, 5000))
+      }
+      
+      if (!approved) {
+        alert('승인 대기 시간이 초과되었습니다.')
+        return
+      }
+      
+      // 승인됨 - 처리 시작
+      setStatus('processing')
+      cancelRef.current = false
+      currentIndexRef.current = 0
+      setShowLivePreview(true) // 실시간 테이블 열기
+      
+      console.log(`🚀 [BIZSCAN] 처리 시작 - 총 ${files.length}개 파일`)
+      
+      await processFiles()
+      
+    } catch (error) {
+      console.error('처리 시작 중 오류:', error)
+      alert('처리 시작 중 오류가 발생했습니다.')
+    }
   }
 
   // 2. 일시정지 + 엑셀 생성
