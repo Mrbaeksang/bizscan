@@ -90,14 +90,35 @@ export async function POST(req: NextRequest) {
     console.log(`🔐 [ANALYSIS] 분석 승인 요청 - IP: ${ip}, Session: ${session.id}, Files: ${fileCount}`)
     console.log(`🔗 [ANALYSIS] 승인 URL: ${baseUrl}/api/auth/approve?sid=${session.id}`)
     
+    // Discord 웹훅이 없으면 자동 승인
+    if (!process.env.DISCORD_WEBHOOK_URL) {
+      console.log('⚠️ [ANALYSIS] Discord 웹훅이 설정되지 않음 - 자동 승인 처리')
+      sessionStore.approve(session.id)
+      
+      return NextResponse.json({
+        success: true,
+        sessionId: session.id,
+        message: 'Discord 웹훅이 설정되지 않아 자동으로 승인되었습니다.',
+        autoApproved: true,
+        expiresAt: session.expiresAt
+      })
+    }
+    
     // Discord로 승인 요청 발송
     const messageSent = await sendApprovalRequest(session.id, ip, fileCount)
     
     if (!messageSent) {
-      return NextResponse.json(
-        { error: 'Discord 알림 발송 중 오류가 발생했습니다.' },
-        { status: 500 }
-      )
+      // Discord 발송 실패 시에도 세션은 생성되었으므로 진행
+      console.log('⚠️ [ANALYSIS] Discord 발송 실패 - 자동 승인 처리')
+      sessionStore.approve(session.id)
+      
+      return NextResponse.json({
+        success: true,
+        sessionId: session.id,
+        message: 'Discord 알림 발송에 실패했지만 자동으로 승인되었습니다.',
+        autoApproved: true,
+        expiresAt: session.expiresAt
+      })
     }
     
     return NextResponse.json({

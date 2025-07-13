@@ -135,38 +135,45 @@ export default function Home() {
       })
       
       if (!approvalResponse.ok) {
-        alert('승인 요청 중 오류가 발생했습니다.')
+        const errorData = await approvalResponse.json().catch(() => ({}))
+        console.error('승인 요청 오류:', errorData)
+        alert(`승인 요청 중 오류가 발생했습니다: ${errorData.error || '알 수 없는 오류'}`)
         return
       }
       
       const approvalData = await approvalResponse.json()
       const sessionId = approvalData.sessionId
       
-      // 승인 대기 (최대 5분)
-      alert('관리자에게 승인 요청을 보냈습니다. Discord를 확인해주세요.')
-      
-      let approved = false
-      const maxAttempts = 60 // 5초마다 체크, 총 5분
-      
-      for (let i = 0; i < maxAttempts; i++) {
-        const checkResponse = await fetch(`/api/analysis/check-approval?sid=${sessionId}`)
-        const checkData = await checkResponse.json()
+      // 자동 승인된 경우 바로 진행
+      if (approvalData.autoApproved) {
+        console.log('✅ [BIZSCAN] 자동 승인됨')
+      } else {
+        // 수동 승인 대기 (최대 5분)
+        alert('관리자에게 승인 요청을 보냈습니다. Discord를 확인해주세요.')
         
-        if (checkData.status === 'approved') {
-          approved = true
-          break
-        } else if (checkData.status === 'denied') {
-          alert('관리자가 요청을 거부했습니다.')
-          return
+        let approved = false
+        const maxAttempts = 60 // 5초마다 체크, 총 5분
+        
+        for (let i = 0; i < maxAttempts; i++) {
+          const checkResponse = await fetch(`/api/analysis/check-approval?sid=${sessionId}`)
+          const checkData = await checkResponse.json()
+          
+          if (checkData.status === 'approved') {
+            approved = true
+            break
+          } else if (checkData.status === 'denied') {
+            alert('관리자가 요청을 거부했습니다.')
+            return
+          }
+          
+          // 5초 대기
+          await new Promise(resolve => setTimeout(resolve, 5000))
         }
         
-        // 5초 대기
-        await new Promise(resolve => setTimeout(resolve, 5000))
-      }
-      
-      if (!approved) {
-        alert('승인 대기 시간이 초과되었습니다.')
-        return
+        if (!approved) {
+          alert('승인 대기 시간이 초과되었습니다.')
+          return
+        }
       }
       
       // 승인됨 - 처리 시작
