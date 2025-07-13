@@ -56,8 +56,8 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
 
   const base64Image = optimizedBuffer.toString('base64')
 
-  // 더 빠른 모델 우선 사용 (gemini-flash만 사용)
-  const models = ['google/gemini-2.0-flash-lite-001']
+  // 더 빠른 모델 우선 사용
+  const models = ['google/gemini-2.0-flash-lite-001', 'anthropic/claude-3-haiku']
   
   console.log(`🎯 [BIZSCAN] 사용할 모델 순위: ${models.join(' → ')}`)
 
@@ -90,7 +90,7 @@ async function extractInfoFromImage(imageBuffer: Buffer): Promise<ExtractedData>
       try {
         // AbortController로 타임아웃 설정 (5초로 단축)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10초로 증가
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
