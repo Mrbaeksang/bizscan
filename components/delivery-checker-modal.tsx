@@ -84,9 +84,9 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
       case 'available':
         return '입점 가능'
       case 'registered':
-        return '이미 입점'
+        return '입점 불가 (이미 등록)'
       default:
-        return '확인 불가'
+        return '입점 불가'
     }
   }
 
