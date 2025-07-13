@@ -65,7 +65,7 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
       } else {
         setError(data.error || '확인 중 오류가 발생했습니다.')
       }
-    } catch (error) {
+    } catch {
       setError('네트워크 오류가 발생했습니다.')
     } finally {
       setLoading(false)
