@@ -72,10 +72,8 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
     switch (status) {
       case 'available':
         return <CheckCircle2 className="w-5 h-5 text-green-500" />
-      case 'registered':
-        return <XCircle className="w-5 h-5 text-red-500" />
       default:
-        return <AlertCircle className="w-5 h-5 text-gray-400" />
+        return <XCircle className="w-5 h-5 text-red-500" />
     }
   }
 
@@ -83,8 +81,6 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
     switch (status) {
       case 'available':
         return '입점 가능'
-      case 'registered':
-        return '입점 불가 (이미 등록)'
       default:
         return '입점 불가'
     }
@@ -94,10 +90,8 @@ export function DeliveryCheckerModal({ open, onClose }: DeliveryCheckerModalProp
     switch (status) {
       case 'available':
         return 'text-green-600'
-      case 'registered':
-        return 'text-red-600'
       default:
-        return 'text-gray-500'
+        return 'text-red-600'
     }
   }
 
