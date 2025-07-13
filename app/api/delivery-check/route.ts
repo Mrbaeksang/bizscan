@@ -21,7 +21,7 @@ async function checkDdangyo(bizRegNo: string): Promise<'registered' | 'available
       },
       body: JSON.stringify({
         dma_onlineApply04: {
-          biz_reg_no: bizRegNo.replace(/-/g, ''),
+          biz_reg_no: bizRegNo,
           sotid: "0000"
         }
       })
@@ -46,8 +46,7 @@ async function checkDdangyo(bizRegNo: string): Promise<'registered' | 'available
 // 요기요 입점 확인
 async function checkYogiyo(bizRegNo: string): Promise<'registered' | 'available' | 'unknown'> {
   try {
-    const cleanBizNo = bizRegNo.replace(/-/g, '')
-    const response = await fetch(`https://ceo-api.yogiyo.co.kr/join/validate-company-number/?company_number=${cleanBizNo}`, {
+    const response = await fetch(`https://ceo-api.yogiyo.co.kr/join/validate-company-number/?company_number=${bizRegNo}`, {
       method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
@@ -77,8 +76,7 @@ async function checkYogiyo(bizRegNo: string): Promise<'registered' | 'available'
 // 쿠팡이츠 입점 확인
 async function checkCoupangEats(bizRegNo: string): Promise<'registered' | 'available' | 'unknown'> {
   try {
-    const cleanBizNo = bizRegNo.replace(/-/g, '')
-    const response = await fetch(`https://store.coupangeats.com/api/v1/merchant/web/businessregistration/verify?bizNo=${cleanBizNo}`, {
+    const response = await fetch(`https://store.coupangeats.com/api/v1/merchant/web/businessregistration/verify?bizNo=${bizRegNo}`, {
       method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -125,19 +123,19 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // 하이픈 포맷팅
-    const formattedNumber = `${cleanNumber.slice(0, 3)}-${cleanNumber.slice(3, 5)}-${cleanNumber.slice(5)}`
+    console.log(`🔍 [DELIVERY CHECK] ${cleanNumber} 배달앱 입점 확인 시작`)
     
-    console.log(`🔍 [DELIVERY CHECK] ${formattedNumber} 배달앱 입점 확인 시작`)
-    
-    // 병렬로 3개 플랫폼 확인
+    // 병렬로 3개 플랫폼 확인 - 하이픈 없는 숫자만 전달
     const [ddangyo, yogiyo, coupangeats] = await Promise.all([
-      checkDdangyo(formattedNumber),
-      checkYogiyo(formattedNumber),
-      checkCoupangEats(formattedNumber)
+      checkDdangyo(cleanNumber),
+      checkYogiyo(cleanNumber),
+      checkCoupangEats(cleanNumber)
     ])
     
     const result: DeliveryStatus = { ddangyo, yogiyo, coupangeats }
+    
+    // 하이픈 포맷팅 (응답용)
+    const formattedNumber = `${cleanNumber.slice(0, 3)}-${cleanNumber.slice(3, 5)}-${cleanNumber.slice(5)}`
     
     console.log(`📋 [DELIVERY CHECK] ${formattedNumber} 결과:`, result)
     
