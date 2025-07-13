@@ -6,9 +6,10 @@ import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
 import { ReviewResultsModal } from '@/components/review-results-modal'
 import { LiveResultsTable } from '@/components/live-results-table'
+import { DeliveryCheckerModal } from '@/components/delivery-checker-modal'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, RefreshCw, Trash2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Download, FileSpreadsheet, Eye, Pause, Play, RefreshCw, Trash2, Truck } from 'lucide-react'
 import { compressImage } from '@/lib/image-utils'
 import { clientStorage } from '@/lib/client-storage'
 import type { ExcelRowData } from '@/lib/excel-generator'
@@ -40,6 +41,7 @@ export default function Home() {
   const [showFailedModal, setShowFailedModal] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [showLivePreview, setShowLivePreview] = useState(false)
+  const [showDeliveryChecker, setShowDeliveryChecker] = useState(false)
   const [reviewResults, setReviewResults] = useState<{
     originalCount: number
     afterDeduplication: number
@@ -615,6 +617,14 @@ export default function Home() {
               </Button>
             )}
 
+            {/* 배달앱 확인 버튼 */}
+            <Button 
+              onClick={() => setShowDeliveryChecker(true)} 
+              variant="outline"
+            >
+              <Truck className="w-4 h-4 mr-2" />
+              배달앱 확인
+            </Button>
 
             {/* 초기화 버튼 */}
             <Button 
@@ -676,6 +686,11 @@ export default function Home() {
         totalFiles={files.length}
         failedCount={failedFiles.length}
         onMemoChange={handleMemoChange}
+      />
+
+      <DeliveryCheckerModal 
+        open={showDeliveryChecker}
+        onClose={() => setShowDeliveryChecker(false)}
       />
     </div>
   )
