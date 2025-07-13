@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sessionStore } from '@/lib/auth/session-store-file'
+import { sessionStore } from '@/lib/auth/session-store'
 
 // Discord 웹훅으로 승인 요청
 async function sendApprovalRequest(sessionId: string, ip: string, fileCount?: number) {
