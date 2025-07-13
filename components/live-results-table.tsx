@@ -191,12 +191,12 @@ export function LiveResultsTable({ isOpen, onClose, data, progress, totalFiles, 
                             onChange={(e) => onMemoChange(actualIndex, e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                e.target.blur(); // 엔터 시 포커스 해제로 저장 확실히
-                                console.log('🔥 [메모저장] 엔터키로 저장:', e.target.value);
+                                (e.target as HTMLInputElement).blur(); // 엔터 시 포커스 해제로 저장 확실히
+                                console.log('🔥 [메모저장] 엔터키로 저장:', (e.target as HTMLInputElement).value);
                               }
                             }}
                             onBlur={(e) => {
-                              console.log('🔥 [메모저장] 포커스 아웃으로 저장:', e.target.value);
+                              console.log('🔥 [메모저장] 포커스 아웃으로 저장:', (e.target as HTMLInputElement).value);
                             }}
                             className="w-full px-2 py-1 border-0 bg-transparent focus:bg-white focus:border focus:border-blue-500 rounded"
                             placeholder="메모 입력 후 엔터..."

@@ -1,0 +1,81 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/qortk/.npm-global/lib/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+        "/home/qortk"
+      ],
+      "env": {}
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/qortk/.npm-global/lib/node_modules/@modelcontextprotocol/server-sequential-thinking/dist/index.js"
+      ],
+      "env": {}
+    },
+    "everything": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/qortk/.npm-global/lib/node_modules/@modelcontextprotocol/server-everything/dist/index.js"
+      ],
+      "env": {}
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/qortk/.npm-global/lib/node_modules/@modelcontextprotocol/server-memory/dist/index.js"
+      ],
+      "env": {}
+    },
+    "github": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@smithery-ai/github/mcp?api_key=f509dfad-7c69-46d4-aa9f-34c53856382b"
+    },
+    "notion": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@smithery/notion/mcp?api_key=520f3936-fc93-4f9c-80e5-8ecd7f97e4d4&profile=worthwhile-crayfish-B5i92g"
+    },
+    "context-7": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@upstash/context7-mcp/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "postgre-sql-database-management-server": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@HenkDz/postgresql-mcp-server/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "redis": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@redis/mcp-redis/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "bright-data": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@luminati-io/brightdata-mcp/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "visualization-charts-server": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@antvis/mcp-server-chart/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "hugeicons-mcp-server": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@hugeicons/mcp-server/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "ref": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@ref-tools/ref-tools-mcp/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "scrape-graph-mcp-server": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@ScrapeGraphAI/scrapegraph-mcp/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    },
+    "mem-0-memory-server": {
+      "type": "http",
+      "url": "https://server.smithery.ai/@big-omega/mem0-mcp/mcp?api_key=d0aad1ee-f773-4584-ac5a-df447fc27962&profile=worthwhile-crayfish-B5i92g"
+    }
+  }
+}
