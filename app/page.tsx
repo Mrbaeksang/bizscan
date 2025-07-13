@@ -128,7 +128,8 @@ export default function Home() {
     }
     
     try {
-      // Discord 승인 요청
+      // Discord 승인 요청 임시 비활성화
+      /*
       console.log('🔐 [BIZSCAN] Discord 승인 요청 중...')
       const approvalResponse = await fetch('/api/analysis/request-approval', {
         method: 'POST',
@@ -177,8 +178,9 @@ export default function Home() {
           return
         }
       }
+      */
       
-      // 승인됨 - 처리 시작
+      // 바로 처리 시작 (승인 과정 스킵)
       setStatus('processing')
       cancelRef.current = false
       currentIndexRef.current = 0
