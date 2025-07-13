@@ -37,11 +37,15 @@ async function checkDdangyo(bizRegNo: string): Promise<'registered' | 'available
     const data = await response.json()
     console.log(`🚚 [DDANGYO] ${bizRegNo} 응답:`, JSON.stringify(data))
     
+    // 실제 응답 구조에 맞춰 수정
     if (data.dma_result?.result === "1000") {
-      return 'registered' // 이미 입점
+      console.log(`🚚 [DDANGYO] ${bizRegNo} 판정: 이미 입점 (result: ${data.dma_result.result})`)
+      return 'registered' // 이미 입점 (result: "1000")
     } else if (data.dma_error?.resultCode === "000") {
-      return 'available' // 입점 가능
+      console.log(`🚚 [DDANGYO] ${bizRegNo} 판정: 입점 가능 (error.resultCode: ${data.dma_error.resultCode})`)
+      return 'available' // 입점 가능 (error의 resultCode가 "000")
     } else {
+      console.log(`🚚 [DDANGYO] ${bizRegNo} 판정: 알 수 없음 - dma_result:`, data.dma_result, 'dma_error:', data.dma_error)
       return 'unknown'
     }
   } catch (error) {
@@ -75,10 +79,13 @@ async function checkYogiyo(bizRegNo: string): Promise<'registered' | 'available'
     
     if (data.message?.includes('이미 등록된') || 
         data.context?.company_number?.[0]?.includes('이미 등록된')) {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 이미 입점 (${data.message || data.context?.company_number?.[0]})`)
       return 'registered' // 이미 입점
     } else if (data.message?.includes('입점신청 가능')) {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 입점 가능 (${data.message})`)
       return 'available' // 입점 가능
     } else {
+      console.log(`🍕 [YOGIYO] ${bizRegNo} 판정: 알 수 없음 (${data.message})`)
       return 'unknown'
     }
   } catch (error) {
@@ -107,15 +114,21 @@ async function checkCoupangEats(bizRegNo: string): Promise<'registered' | 'avail
     const data = await response.json()
     console.log(`🥘 [COUPANG] ${bizRegNo} 응답:`, JSON.stringify(data))
     
+    // 실제 응답 구조에 맞춰 수정
     if (data.error?.message?.includes('이미 등록된 사업자등록번호')) {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 이미 입점 (${data.error.message})`)
       return 'registered' // 이미 입점
     } else if (data.error?.message?.includes('유효하지 않습니다')) {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 알 수 없음 (${data.error.message})`)
       return 'unknown' // 유효하지 않은 사업자번호
     } else if (data.data === true && data.code === "SUCCESS") {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 입점 가능 (data: true, code: SUCCESS)`)
       return 'available' // 입점 가능
     } else if (data.data === null && !data.error) {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 입점 가능 (data: null, no error)`)
       return 'available' // 입점 가능
     } else {
+      console.log(`🥘 [COUPANG] ${bizRegNo} 판정: 알 수 없음 - data:`, data.data, 'error:', data.error, 'code:', data.code)
       return 'unknown'
     }
   } catch (error) {
