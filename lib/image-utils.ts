@@ -12,9 +12,9 @@ export async function compressImage(
   options: CompressOptions = {}
 ): Promise<File> {
   const {
-    maxWidth = 1200,
-    maxHeight = 1200,
-    quality = 0.8,
+    maxWidth = 800,  // 더 작게 압축
+    maxHeight = 800,
+    quality = 0.7,   // 품질도 약간 낮춤
     format = 'jpeg'
   } = options;
 

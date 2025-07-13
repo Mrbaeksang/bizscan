@@ -1,6 +1,16 @@
 {
+  "regions": ["icn1"],
   "functions": {
     "app/api/extract/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/extract-single/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/delivery-check/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/bulk-review-excel/route.ts": {
       "maxDuration": 30
     }
   }
