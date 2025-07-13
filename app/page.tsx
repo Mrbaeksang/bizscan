@@ -362,7 +362,7 @@ export default function Home() {
     } finally {
       setIsGenerating(false)
     }
-  }, []) // 빈 의존성 배열로 함수 안정화
+  }, []) // useCallback으로 함수 메모이제이션
 
   // 최신 데이터로 엑셀 생성 (상태 최신화 보장)
   const generateLatestExcel = useCallback(() => {
