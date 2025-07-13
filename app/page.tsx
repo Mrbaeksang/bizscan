@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { FileDropzone } from '@/components/file-dropzone'
 import { FailedFilesModal } from '@/components/failed-files-modal'
@@ -204,7 +204,7 @@ export default function Home() {
     console.log(`⏸️ [BIZSCAN] 일시정지 - 성공: ${successData.length}개`)
     
     if (successData.length > 0) {
-      await generateExcel(successData)
+      await generateExcel()  // 현재 successData 사용
     }
   }
 
@@ -281,7 +281,7 @@ export default function Home() {
       playCompletionSound()
       
       if (results.length > 0) {
-        await generateExcel(results)
+        await generateExcel()  // 현재 successData 사용 (results와 동일)
       }
       
       console.log(`🎉 [BIZSCAN] 완료 - 성공: ${results.length}개, 실패: ${failed.length}개`)
@@ -306,8 +306,11 @@ export default function Home() {
     return response.data.data
   }
 
-  // 엑셀 생성 함수를 useCallback으로 메모이제이션
-  const generateExcel = useCallback(async (data: ExcelRowData[]) => {
+  // 엑셀 생성 함수 - useCallback 제거하여 항상 최신 상태 사용
+  const generateExcel = async (dataToExport?: ExcelRowData[]) => {
+    // 인자로 받은 데이터가 없으면 현재 successData 사용
+    const data = dataToExport || successData
+    
     setIsGenerating(true)
     setExcelBlob(null) // 기존 엑셀 블롭 초기화하여 새로운 데이터로 생성
     
@@ -362,10 +365,10 @@ export default function Home() {
     } finally {
       setIsGenerating(false)
     }
-  }, []) // useCallback으로 함수 메모이제이션
+  }
 
   // 최신 데이터로 엑셀 생성 (상태 최신화 보장)
-  const generateLatestExcel = useCallback(() => {
+  const generateLatestExcel = () => {
     console.log('📊 [BIZSCAN] 최신 데이터로 엑셀 생성 시작')
     console.log('📊 [BIZSCAN] 현재 successData 길이:', successData.length)
     console.log('📊 [BIZSCAN] 현재 메모 데이터:', successData.map(item => ({ 상호명: item.companyAndRepresentative, 메모: item.memo || '(빈값)' })))
@@ -380,9 +383,9 @@ export default function Home() {
       return;
     }
     
-    // 즉시 최신 상태 사용 - React 18에서 더 안정적
-    generateExcel(successData);
-  }, [successData, generateExcel])
+    // 즉시 최신 상태 사용
+    generateExcel();
+  }
 
   // 엑셀 다운로드
   const downloadExcel = () => {
